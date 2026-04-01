@@ -1,0 +1,126 @@
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">VID<span>VAULT</span></div>
+  <div class="stats" id="stats"></div>
+  <div class="controls">
+    <div class="search-wrap">
+      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input id="search" type="search" placeholder="filter files…" autocomplete="off">
+    </div>
+    <select class="btn" id="sort-select">
+      <option value="name">name ↑</option>
+      <option value="name-desc">name ↓</option>
+      <option value="folder">folder</option>
+      <option value="ext">type</option>
+    </select>
+    <div class="btn-group">
+      <button class="btn active" id="grid-btn" title="Grid view">⊞</button>
+      <button class="btn"        id="list-btn" title="List view">☰</button>
+    </div>
+    <button class="btn" id="select-btn" title="Select multiple">Select</button>
+    <button class="btn upload-btn" id="open-upload-btn">
+      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Upload
+    </button>
+  </div>
+</header>
+
+<div class="shell">
+  <aside>
+    <div class="sidebar-header">
+      <span class="sidebar-label">Folders</span>
+      <button class="new-folder-btn" id="new-folder-btn" title="New folder">+</button>
+    </div>
+    <div class="sidebar-folder-form" id="sidebar-folder-form">
+      <input id="sidebar-folder-input" placeholder="folder name…" autocomplete="off">
+      <button id="sidebar-folder-confirm" title="Create">✓</button>
+      <button id="sidebar-folder-cancel" title="Cancel">✕</button>
+    </div>
+    <div id="folder-list"></div>
+  </aside>
+  <main><div id="gallery"></div></main>
+</div>
+
+<div id="ctx-menu">
+  <div class="ctx-item" id="ctx-move">
+    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 9l4-4 4 4"/><path d="M9 5v14"/><path d="M19 15l-4 4-4-4"/><path d="M15 19V5"/></svg>
+    Move to folder…
+  </div>
+</div>
+
+<div id="move-modal">
+  <div class="move-inner">
+    <div class="move-header">
+      <div><div class="move-title">Move to folder</div><div class="move-subtitle" id="move-subtitle"></div></div>
+      <button class="close-btn" id="move-close">✕</button>
+    </div>
+    <div class="move-body">
+      <div class="move-new-folder">
+        <input id="new-folder-name" placeholder="+ new folder name…" autocomplete="off">
+        <button class="btn" id="add-folder-btn">Create</button>
+      </div>
+      <div id="folder-options"></div>
+    </div>
+    <div class="move-footer">
+      <button class="btn" id="move-cancel-btn">Cancel</button>
+      <button class="btn active" id="move-confirm-btn">Move</button>
+    </div>
+  </div>
+</div>
+
+<div id="upload-modal">
+  <div class="upload-inner">
+    <div class="upload-header">
+      <div class="upload-title">Upload videos</div>
+      <button class="close-btn" id="upload-close">✕</button>
+    </div>
+    <div class="upload-body">
+      <div class="drop-zone" id="drop-zone">
+        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <strong>Drop videos here</strong>
+        <span>or click to browse — webm, mp4, mkv, mov, avi…</span>
+        <input type="file" id="upload-input" multiple accept=".webm,.mp4,.mpv,.mkv,.mov,.avi,.m4v,.ogv">
+      </div>
+      <div class="upload-folder-row">
+        <label>Destination</label>
+        <select id="upload-folder-select"></select>
+        <input id="new-folder-input" placeholder="new/folder/name">
+      </div>
+      <div class="file-queue" id="file-queue"></div>
+    </div>
+    <div class="upload-footer">
+      <span class="upload-summary" id="upload-summary"></span>
+      <div style="display:flex;gap:8px">
+        <button class="btn" id="upload-cancel-btn">Cancel</button>
+        <button class="btn active" id="upload-start-btn" disabled>Upload</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="modal">
+  <div class="modal-inner">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-title"></span>
+      <span class="modal-path"  id="modal-path"></span>
+      <div class="modal-nav">
+        <button class="nav-btn" id="prev-btn">‹</button>
+        <button class="nav-btn" id="next-btn">›</button>
+      </div>
+      <button class="close-btn" id="close-btn">✕</button>
+    </div>
+    <video id="modal-video" controls autoplay></video>
+  </div>
+</div>
+
+<div class="select-bar" id="select-bar">
+  <span class="select-count" id="select-count">0 selected</span>
+  <button class="btn active" id="select-move-btn">Move…</button>
+  <button class="btn" id="select-all-btn">All</button>
+  <button class="btn" id="select-clear-btn">Clear</button>
+</div>
+
+<script>
