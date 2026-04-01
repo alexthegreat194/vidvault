@@ -32,18 +32,20 @@ func main() {
 		log.Fatalf("error: %q is not a directory", root)
 	}
 
-	addr := "127.0.0.1:" + strconv.Itoa(*port)
+	addr := "0.0.0.0:" + strconv.Itoa(*port)
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.Fatalf("error: cannot bind to %s: %v", addr, err)
 	}
 
-	browserURL := "http://localhost:" + strconv.Itoa(*port)
-	fmt.Printf("\n  VIDVAULT  →  %s\n", browserURL)
+	localURL := "http://localhost:" + strconv.Itoa(*port)
+	networkURL := "http://" + lanIP() + ":" + strconv.Itoa(*port)
+	fmt.Printf("\n  VIDVAULT  →  %s\n", localURL)
+	fmt.Printf("  network    →  %s\n", networkURL)
 	fmt.Printf("  scanning   →  %s\n\n", root)
 	fmt.Println("  Press Ctrl+C to stop.\n")
 
-	go openBrowser(browserURL)
+	go openBrowser(localURL)
 
 	log.Fatal(http.Serve(ln, newServer(root)))
 }
