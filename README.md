@@ -6,7 +6,7 @@ Local **Go** HTTP server that turns a directory into a **video gallery**: it dis
 
 ## Screenshot
 
-![Vidvault web UI (gallery)](docs/screenshot.png)
+![Vidvault web UI (gallery)](docs/Screenshot.png)
 
 *Add a PNG (or change the path above) so this image appears—e.g. place a capture at `docs/screenshot.png` in the repository.*
 
