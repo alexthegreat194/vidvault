@@ -26,6 +26,7 @@ type server struct {
 // static routes on a fresh ServeMux.
 func newServer(root string) *server {
 	s := &server{root: root, mux: http.NewServeMux()}
+	s.mux.HandleFunc("GET /favicon.svg", s.handleFavicon)
 	s.mux.HandleFunc("/", s.handleIndex)
 	s.mux.HandleFunc("/api/videos", s.handleVideos)
 	s.mux.HandleFunc("/api/folders", s.handleFolders)
@@ -39,6 +40,16 @@ func newServer(root string) *server {
 
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.mux.ServeHTTP(w, r)
+}
+
+func (s *server) handleFavicon(w http.ResponseWriter, r *http.Request) {
+	data, err := webFS.ReadFile("web/favicon.svg")
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "image/svg+xml")
+	w.Write(data)
 }
 
 func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {

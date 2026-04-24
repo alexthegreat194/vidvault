@@ -1,70 +1,101 @@
-# VIDVAULT
+# Vidvault
 
-A small **local HTTP server** that turns a directory on your machine into a **video gallery**. It scans for supported video files, serves them with range requests (so scrubbing works in the browser), and includes a web UI for browsing, organizing into folders, uploading, and lightbox playback.
+Local **Go** HTTP server that turns a directory into a **video gallery**: it discovers supported video files, streams them with range requests (so seeking works in the browser), and serves a small web UI for browsing, organizing into folders, bulk selection/move, upload, and lightbox playback. The UI is embedded at compile time from `src/web/`.
 
-There is **no authentication**: anyone who can reach the bind address can list and stream files under the chosen root. Run it only on trusted networks or `localhost`.
+**Security:** there is no authentication. Anyone who can reach the listen address can list and stream files under the media root. Use only on trusted networks or `localhost`.
+
+## Screenshot
+
+![Vidvault web UI (gallery)](docs/screenshot.png)
+
+*Add a PNG (or change the path above) so this image appears—e.g. place a capture at `docs/screenshot.png` in the repository.*
 
 ## Requirements
 
-- [Go](https://go.dev/dl/) **1.24.5** or newer (see `go.mod`)
-- A modern desktop browser (the UI uses standard HTML/CSS/JS)
+- [Go](https://go.dev/dl/) **1.24.5**+ (see [`go.mod`](go.mod))
+- A modern desktop browser (HTML, CSS, and client-side JavaScript)
 
 Optional, for formatting frontend JavaScript:
 
-- [Node.js](https://nodejs.org/) — then `npm install` and `npm run format`
+- [Node.js](https://nodejs.org/) — run `npm install` and `npm run format`
 
-## Quick start
+## Run from source
 
 ```bash
 go build -o vidvault ./src
 ./vidvault
 ```
 
-This serves the **current directory** on port **8765**, prints local and LAN URLs, and tries to open the app in your default browser.
+- Serves the **current directory** on port **8765**
+- Prints local and LAN URLs and opens the app in your default browser
+- Listens on **all interfaces** (`0.0.0.0`) so other devices on your LAN can use the “network” URL
 
 Serve a specific folder and port:
 
 ```bash
 ./vidvault /path/to/media --port 9000
-# shorthand
+# or
 ./vidvault ~/Videos -p 9000
 ```
 
-The server listens on **all interfaces** (`0.0.0.0`), so other devices on your LAN can open the “network” URL shown at startup.
+## Run with Docker
+
+The repo includes a multi-stage [`Dockerfile`](Dockerfile) and a helper script.
+
+**Build and run (defaults: image `vidvault:local`, host port `8765`, host data directory `./data` → `/data` in the container):**
+
+```bash
+./scripts/docker-run.sh
+```
+
+Override with environment variables:
+
+| Variable  | Default        | Role                                      |
+| --------- | -------------- | ----------------------------------------- |
+| `IMAGE`   | `vidvault:local` | Docker image name                       |
+| `PORT`    | `8765`         | Host port mapped to the container’s `8765` |
+| `DATA_DIR`| repo `./data`  | Host directory mounted as media root `/data` |
+
+**Manual example:**
+
+```bash
+docker build -t vidvault:local .
+docker run --rm -p 8765:8765 -v /path/to/your/videos:/data vidvault:local -p 8765 /data
+```
+
+The process inside the container uses port `8765`; map your host port with `-p HOST:8765` if you use something other than `docker-run.sh`.
 
 ## Features
 
-| Area | What you get |
-|------|----------------|
-| **Gallery** | Grid or list view, search filter, sort by name / folder / extension |
-| **Folders** | Sidebar navigation; create folders; drag-and-drop move onto a folder; delete folder (moves contained files to root, with rename if names collide) |
-| **Player** | Click a card to open a modal; prev/next and keyboard arrows; video served with `Accept-Ranges` for seeking |
-| **Selection** | “Select” mode, select all / clear, move many files in one go |
-| **Upload** | Modal upload with optional destination folder or new folder name; only allowed video types are accepted server-side |
-| **Warnings** | Folders that contain non-video files are flagged in the UI (those files are not shown in the gallery) |
+| Area         | What you get                                                                 |
+| ------------ | ----------------------------------------------------------------------------- |
+| **Gallery**  | Grid or list view, search filter, sort by name / folder / extension            |
+| **Folders**  | Sidebar; create folders; drag-and-drop onto a folder; delete folder (moves files to root, renames on collision) |
+| **Player**   | Modal lightbox; prev/next and keyboard arrows; streaming with `Accept-Ranges` |
+| **Selection**| Select mode, select all / clear, move many files at once                     |
+| **Upload**   | Modal upload with optional destination or new folder; server validates video types only |
+| **Warnings** | Folders that contain non-video files are flagged (those files are not listed)  |
 
 ## Supported video formats
 
-Files must use one of these extensions (case-insensitive):
-
-`.webm`, `.mp4`, `.mpv`, `.mkv`, `.mov`, `.avi`, `.m4v`, `.ogv`
+Extensions (case-insensitive): `.webm` `.mp4` `.mpv` `.mkv` `.mov` `.avi` `.m4v` `.ogv`
 
 ## HTTP API
 
-All JSON bodies use `Content-Type: application/json` unless noted.
+All JSON request bodies use `Content-Type: application/json` unless noted.
 
-| Method & path | Description |
-|---------------|-------------|
-| `GET /` | Single-page HTML app (embedded assets). |
-| `GET /api/videos` | JSON array of video objects (see below). |
-| `GET /api/folders` | JSON array of `{ "name": string, "has_other_files": boolean }` for directories under the root. |
-| `POST /api/mkdir` | Body: `{ "folder": "relative/path" }`. Creates the directory under the media root. |
-| `POST /api/rmdir` | Body: `{ "folder": "relative/path" }`. Moves **files** inside that folder to the media root (renaming on conflict), then removes the folder tree. |
-| `POST /api/move` | Body: `{ "path": "relative/file.mp4", "dest_folder": "target" }`. `dest_folder` may be empty or `/` for root. Creates destination dirs as needed. |
-| `POST /api/upload` | `multipart/form-data` with fields `file` (one or more) and `folder` (destination path segment). Response: JSON array of `{ "name": "...", "error": "..." }` per file (`error` omitted on success). Max form memory ~512 MiB. |
-| `GET /video?path=…` | Stream a file under the root. Query `path` is URL-encoded, slash-separated relative path. Returns 403 on path traversal; uses correct `Content-Type` and range support. |
+| Method & path      | Description |
+| ------------------ | ----------- |
+| `GET /`            | Single-page HTML (embedded assets). |
+| `GET /api/videos`  | JSON array of video objects (shape below). |
+| `GET /api/folders` | JSON array of `{ "name": string, "has_other_files": boolean }` — one entry per directory under the root; `name` is the slash-separated path relative to the media root. |
+| `POST /api/mkdir`  | Body: `{ "folder": "relative/path" }` — create directory under the media root. |
+| `POST /api/rmdir`  | Body: `{ "folder": "relative/path" }` — move files in that folder to the root (rename on conflict), remove the folder tree. |
+| `POST /api/move`   | Body: `{ "path": "relative/file.mp4", "dest_folder": "target" }` — `dest_folder` may be `""` or `"/"` for root; creates parents as needed. |
+| `POST /api/upload` | `multipart/form-data`: fields `file` (one or more) and `folder` (destination path). Response: JSON array of `{ "name", "error" }` per file (`error` omitted on success). `ParseMultipartForm` limit ≈ 512 MiB. |
+| `GET /video?path=…` | Stream a file under the root; `path` is URL-encoded, slash-separated, relative. `403` on path traversal; correct `Content-Type` and range support. |
 
-**Video JSON shape** (`GET /api/videos`):
+**`GET /api/videos` item shape:**
 
 ```json
 {
@@ -80,19 +111,21 @@ Root-level files use `"folder": "/"`.
 ## Project layout
 
 | Path | Role |
-|------|------|
-| `go.mod` | Go module definition (`vidvault`). |
-| `src/main.go` | CLI flags, resolve media root, print URLs, open browser, start HTTP server. |
+| ---- | ---- |
+| [`go.mod`](go.mod) | Go module (`vidvault`). |
+| [`Dockerfile`](Dockerfile) | Multi-stage image: build Go binary, Alpine runtime, default `CMD` serves `/data` on `8765`. |
+| [`scripts/docker-run.sh`](scripts/docker-run.sh) | Build image and `docker run` with volume and port mapping. |
+| [`package.json`](package.json) | `npm run format` — Prettier on `src/web/**/*.js`. |
+| `src/main.go` | CLI flags, resolve media root, print URLs, open browser, start server. |
 | `src/server.go` | Routes, API handlers, video streaming. |
-| `src/video.go` | Supported extensions, `Video` struct, directory scan. |
-| `src/template.go` | `embed` of `src/web/*` and assembly of the single HTML document. |
-| `src/browser.go` | LAN IP hint and OS-specific default browser launch. |
-| `src/web/head.html`, `body.html`, `foot.html` | Page structure and markup. |
+| `src/video.go` | Supported extensions, `Video` struct, directory walk. |
+| `src/template.go` | `embed` of `src/web/*` and single HTML document assembly. |
+| `src/browser.go` | LAN IP and OS default browser. |
+| `src/web/head.html`, `body.html`, `foot.html` | Page structure. |
 | `src/web/styles.css` | Styling. |
-| `src/web/app.js` | Client logic (fetch APIs, UI). |
-| `package.json` | `npm run format` runs Prettier on `src/web/**/*.js`. |
+| `src/web/app.js` | Client: API calls, UI. |
 
-The shipped UI is **not** loaded from disk at runtime: it is concatenated from the embedded `src/web/` files at compile time. Change those files, then `go build ./src` again.
+Rebuilding the binary (`go build -o vidvault ./src`) is required after changing `src/web/` or Go sources—the UI is not read from disk at runtime.
 
 ## Development
 
@@ -101,7 +134,7 @@ go build -o vidvault ./src
 ./vidvault ./some-test-media -p 8765
 ```
 
-Format JavaScript:
+Format JavaScript with Prettier:
 
 ```bash
 npm install
