@@ -40,7 +40,7 @@ func main() {
 
 	localURL := "http://localhost:" + strconv.Itoa(*port)
 	networkURL := "http://" + lanIP() + ":" + strconv.Itoa(*port)
-	fmt.Printf("\n  VIDVAULT  →  %s\n", localURL)
+	fmt.Printf("\n  VIDVAULT   →  %s\n", localURL)
 	fmt.Printf("  network    →  %s\n", networkURL)
 	fmt.Printf("  scanning   →  %s\n\n", root)
 	fmt.Println("  Press Ctrl+C to stop.\n")
