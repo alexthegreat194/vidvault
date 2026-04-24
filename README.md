@@ -2,13 +2,9 @@
 
 Local **Go** HTTP server that turns a directory into a **video gallery**: it discovers supported video files, streams them with range requests (so seeking works in the browser), and serves a small web UI for browsing, organizing into folders, bulk selection/move, upload, and lightbox playback. The UI is embedded at compile time from `src/web/`.
 
-**Security:** there is no authentication. Anyone who can reach the listen address can list and stream files under the media root. Use only on trusted networks or `localhost`.
-
-## Screenshot
-
 ![Vidvault web UI (gallery)](docs/Screenshot.png)
 
-*Add a PNG (or change the path above) so this image appears—e.g. place a capture at `docs/screenshot.png` in the repository.*
+**Security:** there is no authentication. Anyone who can reach the listen address can list and stream files under the media root. Use only on trusted networks or `localhost`.
 
 ## Requirements
 
