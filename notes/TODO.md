@@ -3,10 +3,10 @@
 - [x] add screenshots to repo
 
 Tweaks:
-- [ ] add all files to top of list
+- [x] add all files to top of list
 
 Features:
-- [ ] sort by date uploaded
+- [x] sort by date uploaded
 - [ ] new section on the client page: "need to be sorted" or "recently added" 
 keeps track of when something was uploaded, if something was uploaded before the last was checked, it will prompt you and give you the option to move it to a folder 
 - [ ] tag videos: tag videos and search by tag. Maybe in the future have the ability to have ai pick which tags should be added to a video in the needs to be added stage

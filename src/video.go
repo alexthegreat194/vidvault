@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
 // videoExts is the set of file extensions (lowercase, dot-prefixed) recognized
@@ -23,10 +24,12 @@ var videoExts = map[string]bool{
 // Video represents a single video file discovered under the root directory.
 // It is serialised to JSON and returned by the /api/videos endpoint.
 type Video struct {
-	Name   string `json:"name"`   // base filename, e.g. "clip.mp4"
-	Path   string `json:"path"`   // slash-separated path relative to root
-	Folder string `json:"folder"` // parent directory relative to root, "/" for root-level files
-	Ext    string `json:"ext"`    // lowercase extension including dot, e.g. ".mp4"
+	Name     string    `json:"name"`     // base filename, e.g. "clip.mp4"
+	Path     string    `json:"path"`     // slash-separated path relative to root
+	Folder   string    `json:"folder"`   // parent directory relative to root, "/" for root-level files
+	Ext      string    `json:"ext"`      // lowercase extension including dot, e.g. ".mp4"
+	Size     int64     `json:"size"`     // file size in bytes
+	Modified time.Time `json:"modified"` // file last modified timestamp
 }
 
 func isValidVideoExtention(ext string) bool {
@@ -53,11 +56,17 @@ func scanVideos(root string) ([]Video, error) {
 		if folder == "." {
 			folder = "/"
 		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
 		videos = append(videos, Video{
-			Name:   filepath.Base(path),
-			Path:   filepath.ToSlash(rel),
-			Folder: filepath.ToSlash(folder),
-			Ext:    ext,
+			Name:     filepath.Base(path),
+			Path:     filepath.ToSlash(rel),
+			Folder:   filepath.ToSlash(folder),
+			Ext:      ext,
+			Size:     info.Size(),
+			Modified: info.ModTime(),
 		})
 		return nil
 	})

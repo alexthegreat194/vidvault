@@ -178,6 +178,20 @@ function render() {
 			);
 		if (sort === "ext")
 			return a.ext.localeCompare(b.ext) || a.name.localeCompare(b.name);
+		if (sort === "modified")
+			return (
+				new Date(a.modified || 0).getTime() - new Date(b.modified || 0).getTime() ||
+				a.name.localeCompare(b.name)
+			);
+		if (sort === "modified-desc")
+			return (
+				new Date(b.modified || 0).getTime() - new Date(a.modified || 0).getTime() ||
+				a.name.localeCompare(b.name)
+			);
+		if (sort === "size")
+			return (Number(a.size || 0) - Number(b.size || 0)) || a.name.localeCompare(b.name);
+		if (sort === "size-desc")
+			return (Number(b.size || 0) - Number(a.size || 0)) || a.name.localeCompare(b.name);
 		return 0;
 	});
 	statsEl.innerHTML =
@@ -215,6 +229,11 @@ function render() {
 			"</span>" +
 			'<span class="card-ext">' +
 			escHtml(v.ext.slice(1)) +
+			"</span>" +
+			'<span class="card-path">' +
+			escHtml(formatBytes(v.size || 0)) +
+			" • " +
+			escHtml(formatModified(v.modified)) +
 			"</span></div>";
 		const vid = card.querySelector("video");
 		const obs = new IntersectionObserver(
@@ -252,6 +271,36 @@ function render() {
 		card.addEventListener("dragend", () => card.classList.remove("dragging"));
 		gallery.appendChild(card);
 	});
+}
+
+/**
+ * Formats bytes as a human-readable string.
+ * @param {number} bytes
+ * @returns {string}
+ */
+function formatBytes(bytes) {
+	const n = Number(bytes) || 0;
+	if (n < 1024) return n + " B";
+	const units = ["KB", "MB", "GB", "TB"];
+	let value = n;
+	let idx = -1;
+	while (value >= 1024 && idx < units.length - 1) {
+		value /= 1024;
+		idx++;
+	}
+	return value.toFixed(value >= 10 ? 0 : 1) + " " + units[idx];
+}
+
+/**
+ * Formats an ISO date/time string for card display.
+ * @param {string} iso
+ * @returns {string}
+ */
+function formatModified(iso) {
+	if (!iso) return "unknown";
+	const d = new Date(iso);
+	if (Number.isNaN(d.getTime())) return "unknown";
+	return d.toLocaleString();
 }
 
 /**
