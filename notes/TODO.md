@@ -4,10 +4,10 @@
 
 Bugs:
 - [x] duplicate manager modal can bunch up duplicate items and hide entries; add vertical scrolling so all results are visible/reviewable
-- [ ] initial app load has a long delay before video handling/loading works reliably
-  - [ ] frontend: separate caching for downloaded videos vs discovered videos
-  - [ ] backend: add caching layer for video/metadata lookups
-  - [ ] backend: stream file metadata progressively so UI updates as files are discovered
+- [x] initial app load has a long delay before video handling/loading works reliably
+  - [x] frontend: separate caching for downloaded videos vs discovered videos
+  - [x] backend: add caching layer for video/metadata lookups
+  - [x] backend: stream file metadata progressively so UI updates as files are discovered
 - [ ] adding/updating tags currently triggers a full video refetch; switch to a tag-specific API flow that fetches only videos needing tag updates
 - [ ] after any select-mode operation completes, automatically disable/exit select mode
 
