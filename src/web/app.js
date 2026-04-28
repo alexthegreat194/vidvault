@@ -1060,6 +1060,10 @@ function renderTagOptions() {
 				await refresh();
 			}
 			renderTagOptions();
+			if (selectMode) {
+				closeTagModal();
+				exitSelectMode();
+			}
 		});
 		row.querySelector(".tag-option-remove").addEventListener(
 			"click",
@@ -2036,6 +2040,7 @@ collectionPickerConfirmBtn.addEventListener("click", async () => {
 	}
 	await refresh();
 	closeCollectionPicker();
+	if (selectMode) exitSelectMode();
 	toast("Added to collection", "success");
 });
 

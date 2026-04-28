@@ -9,9 +9,7 @@ Bugs:
   - [x] backend: add caching layer for video/metadata lookups
   - [x] backend: stream file metadata progressively so UI updates as files are discovered
 - [x] adding/updating tags currently triggers a full video refetch; switch to a tag-specific API flow that fetches only videos needing tag updates
-- [ ] after any select-mode operation completes, automatically disable/exit select mode
-- [ ] When selecting what tags I want, it should not rerender everything
-- [ ] creating new tags or collections should not reredner 
+- [x] after any select-mode operation completes, automatically disable/exit select mode
 - [ ] has trouble with multiple hashes
 
 Tweaks:
