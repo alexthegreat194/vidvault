@@ -15,6 +15,8 @@ import (
 
 const tagsFileName = "tags.json"
 
+var tagsLog = fileLogger("tags")
+
 type Tag struct {
 	ID    string `json:"id"`
 	Name  string `json:"name"`
@@ -36,10 +38,12 @@ type TagsStore struct {
 func newTagsStore() (*TagsStore, error) {
 	cfgDir, err := os.UserConfigDir()
 	if err != nil {
+		tagsLog.Error("failed to resolve user config dir", "error", err)
 		return nil, err
 	}
 	dir := filepath.Join(cfgDir, "vidvault")
 	if err := os.MkdirAll(dir, 0755); err != nil {
+		tagsLog.Error("failed to ensure tags config dir", "dir", dir, "error", err)
 		return nil, err
 	}
 
@@ -49,15 +53,19 @@ func newTagsStore() (*TagsStore, error) {
 		assignments: map[string][]string{},
 	}
 	if err := store.load(); err != nil {
+		tagsLog.Error("failed loading tags store", "path", store.path, "error", err)
 		return nil, err
 	}
+	logDebug(tagsLog, "tags store initialized", "path", store.path, "tags", len(store.tags), "assignments", len(store.assignments))
 	return store, nil
 }
 
 func (s *TagsStore) load() error {
+	logDebug(tagsLog, "loading tags from disk", "path", s.path)
 	raw, err := os.ReadFile(s.path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
+			logDebug(tagsLog, "tags file does not exist yet", "path", s.path)
 			return nil
 		}
 		return err
@@ -104,6 +112,7 @@ func (s *TagsStore) load() error {
 			s.assignments[hash] = clean
 		}
 	}
+	logDebug(tagsLog, "tags loaded", "tags", len(s.tags), "assignments", len(s.assignments))
 	return nil
 }
 
@@ -144,6 +153,7 @@ func (s *TagsStore) Create(name string) (Tag, error) {
 	if trimmed == "" {
 		return Tag{}, errors.New("missing tag name")
 	}
+	logDebug(tagsLog, "creating tag", "name", trimmed)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -162,6 +172,7 @@ func (s *TagsStore) Create(name string) (Tag, error) {
 	if err := s.persistLocked(); err != nil {
 		return Tag{}, err
 	}
+	tagsLog.Info("tag created", "tag_id", tag.ID, "name", tag.Name)
 	return tag, nil
 }
 
@@ -172,6 +183,7 @@ func (s *TagsStore) Delete(tagID string) error {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	logDebug(tagsLog, "deleting tag", "tag_id", tagID)
 
 	nextTags := make([]Tag, 0, len(s.tags))
 	found := false
@@ -213,6 +225,7 @@ func (s *TagsStore) SetAssignment(hash, tagID string, assigned bool) error {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	logDebug(tagsLog, "setting tag assignment", "hash", hash, "tag_id", tagID, "assigned", assigned)
 
 	if !s.hasTagLocked(tagID) {
 		return errors.New("tag not found")
@@ -251,6 +264,7 @@ func (s *TagsStore) hasTagLocked(tagID string) bool {
 }
 
 func (s *TagsStore) persistLocked() error {
+	logDebug(tagsLog, "persisting tags store", "path", s.path, "tags", len(s.tags), "assignments", len(s.assignments))
 	payloadStruct := tagsFile{
 		Tags:        s.tags,
 		Assignments: s.assignments,
@@ -269,6 +283,7 @@ func (s *TagsStore) persistLocked() error {
 		_ = os.Remove(tmpPath)
 		return err
 	}
+	logDebug(tagsLog, "tags store persisted successfully", "path", s.path)
 	return nil
 }
 

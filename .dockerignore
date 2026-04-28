@@ -1,6 +1,13 @@
 .git
+.gitignore
 .DS_Store
-README.md
 node_modules
+npm-debug.log*
+yarn-error.log*
+data
+notes
+docs
+vidvault
+README.md
 package.json
 package-lock.json

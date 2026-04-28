@@ -6,6 +6,8 @@ import (
 	"runtime"
 )
 
+var browserLog = fileLogger("browser")
+
 // ── open browser ──────────────────────────────────────────────────────────────
 
 // lanIP returns the preferred outbound LAN IP address by probing a UDP
@@ -13,10 +15,13 @@ import (
 func lanIP() string {
 	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
+		logDebug(browserLog, "failed to determine lan ip, falling back to localhost", "error", err)
 		return "localhost"
 	}
 	defer conn.Close()
-	return conn.LocalAddr().(*net.UDPAddr).IP.String()
+	ip := conn.LocalAddr().(*net.UDPAddr).IP.String()
+	logDebug(browserLog, "determined lan ip", "ip", ip)
+	return ip
 }
 
 // openBrowser launches url in the system default browser. The call is
@@ -32,5 +37,8 @@ func openBrowser(url string) {
 	default:
 		cmd, args = "xdg-open", []string{url}
 	}
-	exec.Command(cmd, args...).Start()
+	logDebug(browserLog, "opening browser", "command", cmd, "url", url)
+	if err := exec.Command(cmd, args...).Start(); err != nil {
+		browserLog.Error("failed to open browser", "command", cmd, "url", url, "error", err)
+	}
 }

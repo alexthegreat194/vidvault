@@ -12,6 +12,8 @@ import (
 	"time"
 )
 
+var videoLog = fileLogger("video")
+
 // videoExts is the set of file extensions (lowercase, dot-prefixed) recognized
 // as video files. Referenced by scanVideos, handleFolders, and uploadOne.
 var videoExts = map[string]bool{
@@ -51,6 +53,7 @@ func isValidVideoExtention(ext string) bool {
 }
 
 func hashFile(path string) (string, error) {
+	logDebug(videoLog, "hashing file", "path", path)
 	f, err := os.Open(path)
 	if err != nil {
 		return "", err
@@ -62,12 +65,15 @@ func hashFile(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return hex.EncodeToString(hash.Sum(nil)), nil
+	sum := hex.EncodeToString(hash.Sum(nil))
+	logDebug(videoLog, "hashed file", "path", path, "hash", sum)
+	return sum, nil
 }
 
 // Walks root recursively and returns all video files found, sorted
 // by their relative path. Files with extensions not in videoExts are skipped.
 func scanVideos(root string) ([]Video, error) {
+	logDebug(videoLog, "starting video scan", "root", root)
 	var videos []Video
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
@@ -103,6 +109,7 @@ func scanVideos(root string) ([]Video, error) {
 			Modified: info.ModTime(),
 			Hash:     hash,
 		})
+		logDebug(videoLog, "video discovered", "path", filepath.ToSlash(rel), "size", info.Size(), "ext", ext)
 		return nil
 	})
 	if err != nil {
@@ -111,10 +118,12 @@ func scanVideos(root string) ([]Video, error) {
 	sort.Slice(videos, func(i, j int) bool {
 		return videos[i].Path < videos[j].Path
 	})
+	videoLog.Info("video scan completed", "root", root, "count", len(videos))
 	return videos, nil
 }
 
 func deleteVideoByPath(root string, relPath string) error {
+	logDebug(videoLog, "delete requested", "root", root, "path", relPath)
 	if strings.TrimSpace(relPath) == "" {
 		return errEmptyVideoPath
 	}
@@ -149,5 +158,6 @@ func deleteVideoByPath(root string, relPath string) error {
 		}
 		return err
 	}
+	videoLog.Info("video deleted", "path", relPath, "abs_path", fileAbs)
 	return nil
 }

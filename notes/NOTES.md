@@ -27,6 +27,13 @@ PORT=9000 DATA_DIR="$HOME/Movies" ./scripts/docker-run.sh
 
 Then open `http://localhost:9000` (or the chosen port).
 
+## Logging + telemetry follow-up
+
+- Added structured backend logging with per-file loggers (`main`, `server`, `video`, `folders`, `favorites`, `tags`, `collections`, `template`, `browser`).
+- Added request lifecycle telemetry (`method`, `path`, `status`, `duration_ms`) and operation logs for scan/upload/move/delete/tag/favorites/collection flows.
+- Verbose traces are gated behind debug mode (`-d`) so normal container logs stay readable.
+- Docker follow-up: ensure runtime command includes `-d` when deep diagnostics are needed from container logs.
+
 ### Manual `docker run`
 
 ```bash

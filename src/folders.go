@@ -8,6 +8,8 @@ import (
 	"strings"
 )
 
+var foldersLog = fileLogger("folders")
+
 // folderInfo describes a subdirectory under the media root.
 // It is serialised to JSON and returned by the /api/folders endpoint.
 type folderInfo struct {
@@ -16,6 +18,7 @@ type folderInfo struct {
 }
 
 func getFolderMetadata(root string) ([]folderInfo, error) {
+	logDebug(foldersLog, "scanning folder metadata", "root", root)
 	// map of existing folder metadata
 	seen := map[string]*folderInfo{}
 
@@ -64,11 +67,13 @@ func getFolderMetadata(root string) ([]folderInfo, error) {
 		return folders[i].Name < folders[j].Name
 	})
 
+	logDebug(foldersLog, "folder metadata scan completed", "root", root, "count", len(folders))
 	return folders, nil
 }
 
 // Make a new directory in root directory with verification
 func makeDirectory(root string, dirName string) error {
+	logDebug(foldersLog, "create directory requested", "root", root, "dir", dirName)
 	clean := filepath.Clean(filepath.FromSlash(dirName))
 	if strings.HasPrefix(clean, "..") {
 		return errors.New("Directory starts with ..")
@@ -81,10 +86,12 @@ func makeDirectory(root string, dirName string) error {
 	if err := os.MkdirAll(destAbs, 0755); err != nil {
 		return errors.New("Error creating directory")
 	}
+	foldersLog.Info("directory created", "path", filepath.ToSlash(clean))
 	return nil
 }
 
 func removeDirectory(root string, dirName string) error {
+	logDebug(foldersLog, "remove directory requested", "root", root, "dir", dirName)
 	clean := filepath.Clean(filepath.FromSlash(dirName))
 	if clean == "." || strings.HasPrefix(clean, "..") {
 		return errors.New("Directory starts with ..")
@@ -117,10 +124,12 @@ func removeDirectory(root string, dirName string) error {
 		return err
 	}
 
+	foldersLog.Info("directory removed", "path", filepath.ToSlash(clean))
 	return nil
 }
 
 func moveFileToDirectory(root string, path string, dest string) error {
+	logDebug(foldersLog, "move file requested", "root", root, "path", path, "dest", dest)
 	srcClean := filepath.Clean(filepath.FromSlash(path))
 	if strings.HasPrefix(srcClean, "..") {
 		return errors.New("forbidden: path attempts directory traversal")
@@ -151,5 +160,6 @@ func moveFileToDirectory(root string, path string, dest string) error {
 	if err := os.Rename(srcAbs, destAbs); err != nil {
 		return err
 	}
+	foldersLog.Info("file moved", "from", filepath.ToSlash(srcClean), "to", filepath.ToSlash(filepath.Join(destFolder, filepath.Base(srcAbs))))
 	return nil
 }
