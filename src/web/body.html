@@ -63,6 +63,22 @@
     </div>
 
     <div class="sidebar-section">
+      <div class="sidebar-header" id="collections-header">
+        <span class="sidebar-label">Collections</span>
+        <div class="sidebar-actions">
+          <button class="new-folder-btn" id="new-collection-btn" title="New collection">+</button>
+          <button class="collapse-btn" id="collections-collapse-btn" title="Collapse collections">▾</button>
+        </div>
+      </div>
+      <div class="sidebar-collection-form" id="sidebar-collection-form">
+        <input id="sidebar-collection-input" placeholder="collection name…" autocomplete="off">
+        <button id="sidebar-collection-confirm" title="Create">✓</button>
+        <button id="sidebar-collection-cancel" title="Cancel">✕</button>
+      </div>
+      <div id="collection-list"></div>
+    </div>
+
+    <div class="sidebar-section">
       <div class="sidebar-header">
         <span class="sidebar-label">Folders</span>
         <div class="sidebar-actions">
@@ -196,16 +212,57 @@
       </div>
       <button class="close-btn" id="close-btn">✕</button>
     </div>
-    <video id="modal-video" controls autoplay></video>
+    <video id="modal-video" controls autoplay loop></video>
   </div>
 </div>
 
 <div class="select-bar" id="select-bar">
   <span class="select-count" id="select-count">0 selected</span>
   <button class="btn" id="select-tag-btn">Tags…</button>
+  <button class="btn" id="select-collection-btn">Add to collection…</button>
   <button class="btn active" id="select-move-btn">Move…</button>
   <button class="btn" id="select-all-btn">All</button>
   <button class="btn" id="select-clear-btn">Clear</button>
+</div>
+
+<div id="collection-picker-modal">
+  <div class="collection-picker-inner">
+    <div class="collection-picker-header">
+      <div>
+        <div class="collection-picker-title">Add to collection</div>
+        <div class="collection-picker-subtitle" id="collection-picker-subtitle"></div>
+      </div>
+      <button class="close-btn" id="collection-picker-close">✕</button>
+    </div>
+    <div class="collection-picker-body">
+      <div class="collection-new-row">
+        <input id="collection-picker-new-input" placeholder="+ new collection name…" autocomplete="off">
+        <button class="btn" id="collection-picker-new-btn">Create</button>
+      </div>
+      <div id="collection-picker-options"></div>
+    </div>
+    <div class="collection-picker-footer">
+      <button class="btn" id="collection-picker-cancel-btn">Cancel</button>
+      <button class="btn active" id="collection-picker-confirm-btn">Add selected</button>
+    </div>
+  </div>
+</div>
+
+<div id="watch-collection-modal">
+  <div class="watch-collection-inner">
+    <div class="watch-collection-header">
+      <div>
+        <div class="watch-collection-title" id="watch-collection-title"></div>
+        <div class="watch-collection-subtitle" id="watch-collection-subtitle"></div>
+      </div>
+      <div class="watch-collection-actions">
+        <button class="btn" id="watch-collection-rename-btn">Rename</button>
+        <button class="btn" id="watch-collection-delete-btn">Delete</button>
+        <button class="close-btn" id="watch-collection-close">✕</button>
+      </div>
+    </div>
+    <div class="watch-collection-body" id="watch-collection-body"></div>
+  </div>
 </div>
 
 <script>

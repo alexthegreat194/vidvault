@@ -18,10 +18,11 @@ import (
 
 // server holds the absolute path of the media root and the HTTP multiplexer.
 type server struct {
-	root      string // absolute path to the directory being served
-	favorites *FavoritesStore
-	tags      *TagsStore
-	mux       *http.ServeMux
+	root        string // absolute path to the directory being served
+	favorites   *FavoritesStore
+	tags        *TagsStore
+	collections *WatchCollectionsStore
+	mux         *http.ServeMux
 }
 
 // newServer constructs a server rooted at root and registers all API and
@@ -35,8 +36,18 @@ func newServer(root string) (*server, error) {
 	if err != nil {
 		return nil, err
 	}
+	collections, err := newWatchCollectionsStore()
+	if err != nil {
+		return nil, err
+	}
 
-	s := &server{root: root, favorites: favorites, tags: tags, mux: http.NewServeMux()}
+	s := &server{
+		root:        root,
+		favorites:   favorites,
+		tags:        tags,
+		collections: collections,
+		mux:         http.NewServeMux(),
+	}
 	s.mux.HandleFunc("GET /favicon.svg", s.handleFavicon)
 	s.mux.HandleFunc("/", s.handleIndex)
 	s.mux.HandleFunc("/api/videos", s.handleVideos)
@@ -46,6 +57,12 @@ func newServer(root string) (*server, error) {
 	s.mux.HandleFunc("POST /api/tags/create", s.handleCreateTag)
 	s.mux.HandleFunc("POST /api/tags/assign", s.handleAssignTag)
 	s.mux.HandleFunc("POST /api/tags/delete", s.handleDeleteTag)
+	s.mux.HandleFunc("GET /api/collections", s.handleCollections)
+	s.mux.HandleFunc("POST /api/collections/create", s.handleCreateCollection)
+	s.mux.HandleFunc("POST /api/collections/rename", s.handleRenameCollection)
+	s.mux.HandleFunc("POST /api/collections/delete", s.handleDeleteCollection)
+	s.mux.HandleFunc("POST /api/collections/videos/set", s.handleSetCollectionVideo)
+	s.mux.HandleFunc("POST /api/collections/videos/bulk", s.handleBulkCollectionVideos)
 	s.mux.HandleFunc("/api/folders", s.handleFolders)
 	s.mux.HandleFunc("/api/mkdir", s.handleMkdir)
 	s.mux.HandleFunc("/api/rmdir", s.handleRmdir)
@@ -168,6 +185,96 @@ func (s *server) handleDeleteTag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.tags.Delete(req.TagID); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func (s *server) handleCollections(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(struct {
+		Collections []WatchCollection `json:"collections"`
+	}{
+		Collections: s.collections.Snapshot(),
+	})
+}
+
+func (s *server) handleCreateCollection(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	collection, err := s.collections.Create(req.Name)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(collection)
+}
+
+func (s *server) handleRenameCollection(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	if err := s.collections.Rename(req.ID, req.Name); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func (s *server) handleDeleteCollection(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	if err := s.collections.Delete(req.ID); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func (s *server) handleSetCollectionVideo(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ID       string `json:"id"`
+		Hash     string `json:"hash"`
+		Assigned bool   `json:"assigned"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	if err := s.collections.SetVideo(req.ID, req.Hash, req.Assigned); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func (s *server) handleBulkCollectionVideos(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ID     string   `json:"id"`
+		Hashes []string `json:"hashes"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	if err := s.collections.AddVideos(req.ID, req.Hashes); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}

@@ -31,10 +31,18 @@ const gallery = document.getElementById("gallery"),
 	sidebarTagInput = document.getElementById("sidebar-tag-input"),
 	sidebarTagConfirm = document.getElementById("sidebar-tag-confirm"),
 	sidebarTagCancel = document.getElementById("sidebar-tag-cancel"),
+	newCollectionBtn = document.getElementById("new-collection-btn"),
+	sidebarCollectionForm = document.getElementById("sidebar-collection-form"),
+	sidebarCollectionInput = document.getElementById("sidebar-collection-input"),
+	sidebarCollectionConfirm = document.getElementById("sidebar-collection-confirm"),
+	sidebarCollectionCancel = document.getElementById("sidebar-collection-cancel"),
+	collectionList = document.getElementById("collection-list"),
+	collectionsCollapseBtn = document.getElementById("collections-collapse-btn"),
 	tagsCollapseBtn = document.getElementById("tags-collapse-btn"),
 	foldersCollapseBtn = document.getElementById("folders-collapse-btn"),
 	tagsSection = tagsCollapseBtn.closest(".sidebar-section"),
 	foldersSection = foldersCollapseBtn.closest(".sidebar-section"),
+	collectionsSection = collectionsCollapseBtn.closest(".sidebar-section"),
 	dupBanner = document.getElementById("dup-banner"),
 	dupBannerText = document.getElementById("dup-banner-text"),
 	dupReviewBtn = document.getElementById("dup-review-btn"),
@@ -51,7 +59,23 @@ const gallery = document.getElementById("gallery"),
 	tagClose = document.getElementById("tag-close"),
 	tagCancelBtn = document.getElementById("tag-cancel-btn"),
 	tagNewInput = document.getElementById("tag-new-input"),
-	tagNewBtn = document.getElementById("tag-new-btn");
+	tagNewBtn = document.getElementById("tag-new-btn"),
+	selectCollectionBtn = document.getElementById("select-collection-btn"),
+	collectionPickerModal = document.getElementById("collection-picker-modal"),
+	collectionPickerSubtitle = document.getElementById("collection-picker-subtitle"),
+	collectionPickerOptions = document.getElementById("collection-picker-options"),
+	collectionPickerClose = document.getElementById("collection-picker-close"),
+	collectionPickerCancelBtn = document.getElementById("collection-picker-cancel-btn"),
+	collectionPickerConfirmBtn = document.getElementById("collection-picker-confirm-btn"),
+	collectionPickerNewInput = document.getElementById("collection-picker-new-input"),
+	collectionPickerNewBtn = document.getElementById("collection-picker-new-btn"),
+	watchCollectionModal = document.getElementById("watch-collection-modal"),
+	watchCollectionTitle = document.getElementById("watch-collection-title"),
+	watchCollectionSubtitle = document.getElementById("watch-collection-subtitle"),
+	watchCollectionBody = document.getElementById("watch-collection-body"),
+	watchCollectionClose = document.getElementById("watch-collection-close"),
+	watchCollectionDeleteBtn = document.getElementById("watch-collection-delete-btn"),
+	watchCollectionRenameBtn = document.getElementById("watch-collection-rename-btn");
 
 let ALL_VIDEOS = [],
 	ALL_FOLDERS = [],
@@ -59,6 +83,8 @@ let ALL_VIDEOS = [],
 	ALL_TAGS = [],
 	TAG_ASSIGNMENTS = {},
 	TAG_MAP = {},
+	ALL_COLLECTIONS = [],
+	COLLECTION_MAP = {},
 	activeTagFilters = new Set(),
 	filtered = [],
 	activeFolder = "__all__",
@@ -70,6 +96,14 @@ let DUPLICATE_GROUPS = [],
 	autoOpenedDuplicates = false;
 let showFavoritesOnly = false;
 let tagTargetPaths = [];
+let activeCollectionID = "";
+let collectionPickerTargetHashes = [];
+const DEFAULT_LOOP_ALL_VIDEOS = true;
+
+function applyDefaultVideoFlags(videoEl) {
+	if (!videoEl) return;
+	videoEl.loop = DEFAULT_LOOP_ALL_VIDEOS;
+}
 
 /**
  * Populates ALL_FOLDERS (string[]) and FOLDER_META (name → folderInfo) from
@@ -88,6 +122,22 @@ function parseTags(data) {
 			? data.assignments
 			: {};
 	TAG_MAP = Object.fromEntries(ALL_TAGS.map((t) => [t.id, t]));
+}
+
+function parseCollections(data) {
+	const raw =
+		data && Array.isArray(data.collections) ? data.collections : [];
+	ALL_COLLECTIONS = raw.map((c) => ({
+		id: c.id,
+		name: c.name,
+		video_hashes: Array.isArray(c.video_hashes) ? c.video_hashes : [],
+		created_at: c.created_at || "",
+		updated_at: c.updated_at || "",
+	}));
+	COLLECTION_MAP = Object.fromEntries(ALL_COLLECTIONS.map((c) => [c.id, c]));
+	if (activeCollectionID && !COLLECTION_MAP[activeCollectionID]) {
+		activeCollectionID = "";
+	}
 }
 
 function tagCountByID(tagID) {
@@ -118,33 +168,40 @@ function renderVideoTagChips(tagIDs) {
 
 
 async function init() {
-	const [vr, fr, tr] = await Promise.all([
+	const [vr, fr, tr, cr] = await Promise.all([
 		fetch("/api/videos"),
 		fetch("/api/folders"),
 		fetch("/api/tags"),
+		fetch("/api/collections"),
 	]);
 	ALL_VIDEOS = await vr.json();
 	parseFolders(await fr.json());
 	parseTags(await tr.json());
+	parseCollections(await cr.json());
 	computeDuplicateGroups();
 	buildTagNav();
 	buildFolderNav();
+	buildCollectionNav();
 	render();
 	updateDuplicateBanner(true);
 	populateUploadFolders();
+	applyDefaultVideoFlags(modalVid);
 }
 async function refresh() {
-	const [vr, fr, tr] = await Promise.all([
+	const [vr, fr, tr, cr] = await Promise.all([
 		fetch("/api/videos"),
 		fetch("/api/folders"),
 		fetch("/api/tags"),
+		fetch("/api/collections"),
 	]);
 	ALL_VIDEOS = await vr.json();
 	parseFolders(await fr.json());
 	parseTags(await tr.json());
+	parseCollections(await cr.json());
 	computeDuplicateGroups();
 	buildTagNav();
 	buildFolderNav();
+	buildCollectionNav();
 	render();
 	updateDuplicateBanner(false);
 	populateUploadFolders();
@@ -405,6 +462,55 @@ function buildFolderNav() {
 	}
 }
 
+function countCollectionResolvedVideos(collection) {
+	const hashes = new Set(collection.video_hashes || []);
+	return ALL_VIDEOS.filter((v) => hashes.has(v.hash)).length;
+}
+
+function buildCollectionNav() {
+	collectionList.innerHTML = "";
+	for (const collection of ALL_COLLECTIONS) {
+		const btn = document.createElement("button");
+		btn.className =
+			"collection-btn" + (collection.id === activeCollectionID ? " active" : "");
+		btn.innerHTML =
+			'<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>' +
+			"<span>" +
+			escHtml(collection.name) +
+			"</span>" +
+			'<span class="count">' +
+			countCollectionResolvedVideos(collection) +
+			'</span><button class="collection-rename-btn" title="Rename collection">✎</button><button class="collection-remove-btn" title="Delete collection">✕</button>';
+
+		btn.addEventListener("click", () => openWatchCollection(collection.id));
+		btn.querySelector(".collection-remove-btn").addEventListener("click", async (e) => {
+			e.stopPropagation();
+			if (!confirm('Delete collection "' + collection.name + '"?')) return;
+			const ok = await deleteCollection(collection.id);
+			if (!ok) {
+				toast("Collection delete failed", "error");
+				return;
+			}
+			if (activeCollectionID === collection.id) closeWatchCollection();
+			await refresh();
+			toast("Deleted " + collection.name, "success");
+		});
+		btn.querySelector(".collection-rename-btn").addEventListener("click", async (e) => {
+			e.stopPropagation();
+			const nextName = prompt("Rename collection", collection.name);
+			if (!nextName || !nextName.trim()) return;
+			const ok = await renameCollection(collection.id, nextName.trim());
+			if (!ok) {
+				toast("Collection rename failed", "error");
+				return;
+			}
+			await refresh();
+			if (activeCollectionID === collection.id) openWatchCollection(collection.id);
+		});
+		collectionList.appendChild(btn);
+	}
+}
+
 function render() {
 	const q = searchEl.value.toLowerCase(),
 		sort = sortSel.value;
@@ -497,6 +603,7 @@ function render() {
 			renderVideoTagChips(v.tags || []) +
 			"</div>";
 		const vid = card.querySelector("video");
+		applyDefaultVideoFlags(vid);
 		const favBtn = card.querySelector(".fav-toggle");
 		const obs = new IntersectionObserver(
 			(entries) => {
@@ -1088,6 +1195,122 @@ uploadStartBtn.addEventListener("click", async () => {
 	toast("Upload complete", "success");
 });
 
+function resolveCollectionVideos(collection) {
+	const byHash = new Map();
+	for (const v of ALL_VIDEOS) {
+		if (!v.hash || byHash.has(v.hash)) continue;
+		byHash.set(v.hash, v);
+	}
+	const ordered = [];
+	const missing = [];
+	for (const hash of collection.video_hashes || []) {
+		const v = byHash.get(hash);
+		if (v) ordered.push(v);
+		else missing.push(hash);
+	}
+	return { ordered, missing };
+}
+
+function openWatchCollection(collectionID) {
+	const collection = COLLECTION_MAP[collectionID];
+	if (!collection) return;
+	activeCollectionID = collectionID;
+	buildCollectionNav();
+	const { ordered, missing } = resolveCollectionVideos(collection);
+	watchCollectionTitle.textContent = collection.name;
+	watchCollectionSubtitle.textContent =
+		ordered.length +
+		" video" +
+		(ordered.length === 1 ? "" : "s") +
+		(missing.length ? " • " + missing.length + " missing" : "");
+	watchCollectionBody.innerHTML = "";
+	if (!ordered.length) {
+		watchCollectionBody.innerHTML =
+			'<div class="watch-collection-empty">No playable videos in this collection yet.</div>';
+	} else {
+		const grid = document.createElement("div");
+		grid.className = "watch-grid";
+		for (const v of ordered) {
+			const tile = document.createElement("div");
+			tile.className = "watch-tile";
+			tile.innerHTML =
+				'<video controls loop preload="metadata" src="/video?path=' +
+				encodeURIComponent(v.path) +
+				'"></video><div class="watch-tile-meta"><span class="watch-tile-name" title="' +
+				escHtml(v.name) +
+				'">' +
+				escHtml(v.name) +
+				'</span><span class="watch-tile-path">' +
+				escHtml(v.folder || "/") +
+				'</span><button class="watch-tile-remove" title="Remove from collection">✕</button></div>';
+			tile.querySelector(".watch-tile-remove").addEventListener("click", async () => {
+				const ok = await setCollectionVideo(collection.id, v.hash, false);
+				if (!ok) {
+					toast("Remove failed", "error");
+					return;
+				}
+				await refresh();
+				openWatchCollection(collection.id);
+			});
+			grid.appendChild(tile);
+		}
+		watchCollectionBody.appendChild(grid);
+	}
+	watchCollectionModal.classList.add("open");
+}
+
+function closeWatchCollection() {
+	watchCollectionModal.classList.remove("open");
+	activeCollectionID = "";
+	buildCollectionNav();
+	watchCollectionBody
+		.querySelectorAll("video")
+		.forEach((v) => {
+			v.pause();
+			v.src = "";
+		});
+}
+
+function openCollectionPicker(hashes) {
+	collectionPickerTargetHashes = hashes.filter(Boolean);
+	collectionPickerSelectedID = ALL_COLLECTIONS[0]?.id || "";
+	collectionPickerSubtitle.textContent =
+		collectionPickerTargetHashes.length +
+		" video" +
+		(collectionPickerTargetHashes.length === 1 ? "" : "s") +
+		" selected";
+	renderCollectionPickerOptions();
+	collectionPickerModal.classList.add("open");
+}
+
+function closeCollectionPicker() {
+	collectionPickerModal.classList.remove("open");
+	collectionPickerTargetHashes = [];
+	collectionPickerSelectedID = "";
+}
+
+let collectionPickerSelectedID = "";
+function renderCollectionPickerOptions() {
+	collectionPickerOptions.innerHTML = "";
+	for (const collection of ALL_COLLECTIONS) {
+		const option = document.createElement("div");
+		option.className =
+			"collection-picker-option" +
+			(collection.id === collectionPickerSelectedID ? " selected" : "");
+		option.innerHTML =
+			'<span>' +
+			escHtml(collection.name) +
+			'</span><span class="count">' +
+			countCollectionResolvedVideos(collection) +
+			"</span>";
+		option.addEventListener("click", () => {
+			collectionPickerSelectedID = collection.id;
+			renderCollectionPickerOptions();
+		});
+		collectionPickerOptions.appendChild(option);
+	}
+}
+
 searchEl.addEventListener("input", render);
 sortSel.addEventListener("change", render);
 gridBtn.addEventListener("click", () => {
@@ -1158,6 +1381,16 @@ selectTagBtn.addEventListener("click", () => {
 	if (!targets.length) return;
 	openTagModal(targets);
 });
+selectCollectionBtn.addEventListener("click", () => {
+	if (!selectedPaths.size) return;
+	const targets = filtered.filter((v) => selectedPaths.has(v.path));
+	const hashes = [...new Set(targets.map((v) => v.hash).filter(Boolean))];
+	if (!hashes.length) {
+		toast("No valid hashes found in selection", "error");
+		return;
+	}
+	openCollectionPicker(hashes);
+});
 selectAllBtn.addEventListener("click", () => {
 	filtered.forEach((v) => selectedPaths.add(v.path));
 	document.querySelectorAll(".card").forEach((c) => {
@@ -1203,8 +1436,40 @@ sidebarTagInput.addEventListener("keydown", (e) => {
 	if (e.key === "Escape") hideSidebarTagForm();
 });
 
+// collections (sidebar)
+newCollectionBtn.addEventListener("click", () => {
+	sidebarCollectionForm.classList.add("visible");
+	sidebarCollectionInput.value = "";
+	sidebarCollectionInput.focus();
+});
+function hideSidebarCollectionForm() {
+	sidebarCollectionForm.classList.remove("visible");
+	sidebarCollectionInput.value = "";
+}
+sidebarCollectionCancel.addEventListener("click", hideSidebarCollectionForm);
+async function createSidebarCollection() {
+	const name = sidebarCollectionInput.value.trim();
+	if (!name) return;
+	const created = await createCollection(name);
+	if (!created) {
+		toast("Failed: collection already exists or request failed", "error");
+		return;
+	}
+	hideSidebarCollectionForm();
+	toast("Created collection " + name, "success");
+	await refresh();
+}
+sidebarCollectionConfirm.addEventListener("click", createSidebarCollection);
+sidebarCollectionInput.addEventListener("keydown", (e) => {
+	if (e.key === "Enter") createSidebarCollection();
+	if (e.key === "Escape") hideSidebarCollectionForm();
+});
+
 tagsCollapseBtn.addEventListener("click", () => {
 	tagsSection.classList.toggle("collapsed");
+});
+collectionsCollapseBtn.addEventListener("click", () => {
+	collectionsSection.classList.toggle("collapsed");
 });
 foldersCollapseBtn.addEventListener("click", () => {
 	foldersSection.classList.toggle("collapsed");
@@ -1327,6 +1592,72 @@ async function setTagAssignment(hash, tagID, assigned) {
 	}
 }
 
+async function createCollection(name) {
+	try {
+		const res = await fetch("/api/collections/create", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ name }),
+		});
+		if (!res.ok) return null;
+		return await res.json();
+	} catch (e) {
+		return null;
+	}
+}
+
+async function renameCollection(id, name) {
+	try {
+		const res = await fetch("/api/collections/rename", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ id, name }),
+		});
+		return res.ok;
+	} catch (e) {
+		return false;
+	}
+}
+
+async function deleteCollection(id) {
+	try {
+		const res = await fetch("/api/collections/delete", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ id }),
+		});
+		return res.ok;
+	} catch (e) {
+		return false;
+	}
+}
+
+async function setCollectionVideo(id, hash, assigned) {
+	try {
+		const res = await fetch("/api/collections/videos/set", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ id, hash, assigned }),
+		});
+		return res.ok;
+	} catch (e) {
+		return false;
+	}
+}
+
+async function bulkAddCollectionVideos(id, hashes) {
+	try {
+		const res = await fetch("/api/collections/videos/bulk", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ id, hashes }),
+		});
+		return res.ok;
+	} catch (e) {
+		return false;
+	}
+}
+
 async function resolveDuplicateGroup(hash) {
 	const group = DUPLICATE_GROUPS.find((g) => g.hash === hash);
 	if (!group || group.members.length < 2) return;
@@ -1391,5 +1722,73 @@ dupModal.addEventListener("click", (e) => {
 	if (e.target === dupModal) closeDuplicateModal();
 });
 dupResolveAllBtn.addEventListener("click", resolveAllDuplicateGroups);
+
+collectionPickerClose.addEventListener("click", closeCollectionPicker);
+collectionPickerCancelBtn.addEventListener("click", closeCollectionPicker);
+collectionPickerModal.addEventListener("click", (e) => {
+	if (e.target === collectionPickerModal) closeCollectionPicker();
+});
+collectionPickerNewBtn.addEventListener("click", async () => {
+	const name = collectionPickerNewInput.value.trim();
+	if (!name) return;
+	const created = await createCollection(name);
+	if (!created) {
+		toast("Create collection failed", "error");
+		return;
+	}
+	collectionPickerNewInput.value = "";
+	await refresh();
+	collectionPickerSelectedID = created.id;
+	renderCollectionPickerOptions();
+});
+collectionPickerNewInput.addEventListener("keydown", (e) => {
+	if (e.key === "Enter") collectionPickerNewBtn.click();
+});
+collectionPickerConfirmBtn.addEventListener("click", async () => {
+	if (!collectionPickerSelectedID || !collectionPickerTargetHashes.length) return;
+	const ok = await bulkAddCollectionVideos(
+		collectionPickerSelectedID,
+		collectionPickerTargetHashes,
+	);
+	if (!ok) {
+		toast("Add to collection failed", "error");
+		return;
+	}
+	await refresh();
+	closeCollectionPicker();
+	toast("Added to collection", "success");
+});
+
+watchCollectionClose.addEventListener("click", closeWatchCollection);
+watchCollectionModal.addEventListener("click", (e) => {
+	if (e.target === watchCollectionModal) closeWatchCollection();
+});
+watchCollectionDeleteBtn.addEventListener("click", async () => {
+	if (!activeCollectionID) return;
+	const c = COLLECTION_MAP[activeCollectionID];
+	if (!c) return;
+	if (!confirm('Delete collection "' + c.name + '"?')) return;
+	const ok = await deleteCollection(activeCollectionID);
+	if (!ok) {
+		toast("Collection delete failed", "error");
+		return;
+	}
+	closeWatchCollection();
+	await refresh();
+});
+watchCollectionRenameBtn.addEventListener("click", async () => {
+	if (!activeCollectionID) return;
+	const c = COLLECTION_MAP[activeCollectionID];
+	if (!c) return;
+	const nextName = prompt("Rename collection", c.name);
+	if (!nextName || !nextName.trim()) return;
+	const ok = await renameCollection(activeCollectionID, nextName.trim());
+	if (!ok) {
+		toast("Collection rename failed", "error");
+		return;
+	}
+	await refresh();
+	openWatchCollection(activeCollectionID);
+});
 
 init();
