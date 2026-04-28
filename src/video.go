@@ -35,6 +35,7 @@ type Video struct {
 	Size     int64     `json:"size"`     // file size in bytes
 	Modified time.Time `json:"modified"` // file last modified timestamp
 	Hash     string    `json:"hash"`     // SHA-256 hash of the file
+	Favorite bool      `json:"is_favorite"`
 }
 
 var (

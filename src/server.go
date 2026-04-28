@@ -18,17 +18,25 @@ import (
 
 // server holds the absolute path of the media root and the HTTP multiplexer.
 type server struct {
-	root string // absolute path to the directory being served
-	mux  *http.ServeMux
+	root      string // absolute path to the directory being served
+	favorites *FavoritesStore
+	mux       *http.ServeMux
 }
 
 // newServer constructs a server rooted at root and registers all API and
 // static routes on a fresh ServeMux.
-func newServer(root string) *server {
-	s := &server{root: root, mux: http.NewServeMux()}
+func newServer(root string) (*server, error) {
+	favorites, err := newFavoritesStore()
+	if err != nil {
+		return nil, err
+	}
+
+	s := &server{root: root, favorites: favorites, mux: http.NewServeMux()}
 	s.mux.HandleFunc("GET /favicon.svg", s.handleFavicon)
 	s.mux.HandleFunc("/", s.handleIndex)
 	s.mux.HandleFunc("/api/videos", s.handleVideos)
+	s.mux.HandleFunc("GET /api/favorites", s.handleFavorites)
+	s.mux.HandleFunc("POST /api/favorites/set", s.handleSetFavorite)
 	s.mux.HandleFunc("/api/folders", s.handleFolders)
 	s.mux.HandleFunc("/api/mkdir", s.handleMkdir)
 	s.mux.HandleFunc("/api/rmdir", s.handleRmdir)
@@ -36,7 +44,7 @@ func newServer(root string) *server {
 	s.mux.HandleFunc("/api/delete", s.handleDelete)
 	s.mux.HandleFunc("/api/upload", s.handleUpload)
 	s.mux.HandleFunc("/video", s.handleVideo)
-	return s
+	return s, nil
 }
 
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -70,8 +78,36 @@ func (s *server) handleVideos(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	for i := range videos {
+		videos[i].Favorite = s.favorites.IsFavorite(videos[i].Hash)
+	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(videos)
+}
+
+func (s *server) handleFavorites(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(s.favorites.Snapshot())
+}
+
+func (s *server) handleSetFavorite(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Hash     string `json:"hash"`
+		Favorite bool   `json:"favorite"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	if strings.TrimSpace(req.Hash) == "" {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	if err := s.favorites.Set(req.Hash, req.Favorite); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }
 
 // Handler for

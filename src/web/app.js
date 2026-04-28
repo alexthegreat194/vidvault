@@ -5,6 +5,7 @@ const gallery = document.getElementById("gallery"),
 	sortSel = document.getElementById("sort-select"),
 	gridBtn = document.getElementById("grid-btn"),
 	listBtn = document.getElementById("list-btn"),
+	favoritesOnlyToggle = document.getElementById("favorites-only-toggle"),
 	modal = document.getElementById("modal"),
 	modalVid = document.getElementById("modal-video"),
 	modalTitle = document.getElementById("modal-title"),
@@ -45,6 +46,7 @@ let selectMode = false,
 let DUPLICATE_GROUPS = [],
 	duplicateBannerDismissed = false,
 	autoOpenedDuplicates = false;
+let showFavoritesOnly = false;
 
 /**
  * Populates ALL_FOLDERS (string[]) and FOLDER_META (name → folderInfo) from
@@ -313,11 +315,12 @@ function render() {
 		sort = sortSel.value;
 	filtered = ALL_VIDEOS.filter((v) => {
 		const inF = activeFolder === "__all__" || (v.folder || "/") == activeFolder;
+		const inFav = !showFavoritesOnly || Boolean(v.is_favorite);
 		const inS =
 			!q ||
 			v.name.toLowerCase().includes(q) ||
 			(v.folder || "").toLowerCase().includes(q);
-		return inF && inS;
+		return inF && inFav && inS;
 	});
 	filtered.sort((a, b) => {
 		if (sort === "name") return a.name.localeCompare(b.name);
@@ -367,6 +370,13 @@ function render() {
 		card.dataset.path = v.path;
 		card.innerHTML =
 			'<div class="thumb"><video preload="metadata" muted></video>' +
+			'<button class="fav-toggle' +
+			(v.is_favorite ? " active" : "") +
+			'" title="' +
+			(v.is_favorite ? "Remove favorite" : "Mark favorite") +
+			'" aria-label="' +
+			(v.is_favorite ? "Remove favorite" : "Mark favorite") +
+			'">★</button>' +
 			'<div class="play-icon"><svg viewBox="0 0 36 36" fill="none"><circle cx="18" cy="18" r="17" fill="rgba(0,0,0,.55)" stroke="rgba(255,255,255,.25)" stroke-width="1"/><polygon points="14,11 27,18 14,25" fill="white"/></svg></div>' +
 			'<div class="drag-handle" title="Drag to move"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 10 18"><circle cx="3" cy="2" r="1.5" fill="white"/><circle cx="7" cy="2" r="1.5" fill="white"/><circle cx="3" cy="9" r="1.5" fill="white"/><circle cx="7" cy="9" r="1.5" fill="white"/><circle cx="3" cy="16" r="1.5" fill="white"/><circle cx="7" cy="16" r="1.5" fill="white"/></svg></div>' +
 			'<div class="check-overlay"><svg viewBox="0 0 10 8" fill="none" width="10" height="8"><polyline points="1,4 3.5,7 9,1" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>' +
@@ -387,6 +397,7 @@ function render() {
 			escHtml(formatModified(v.modified)) +
 			"</span></div>";
 		const vid = card.querySelector("video");
+		const favBtn = card.querySelector(".fav-toggle");
 		const obs = new IntersectionObserver(
 			(entries) => {
 				if (entries[0].isIntersecting) {
@@ -402,8 +413,26 @@ function render() {
 			{ threshold: 0.1 },
 		);
 		obs.observe(card);
+		favBtn.addEventListener("click", async (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			const nextValue = !v.is_favorite;
+			const ok = await setFavorite(v.hash, nextValue);
+			if (!ok) {
+				toast("Favorite update failed", "error");
+				return;
+			}
+			v.is_favorite = nextValue;
+			favBtn.classList.toggle("active", nextValue);
+			favBtn.title = nextValue ? "Remove favorite" : "Mark favorite";
+			favBtn.setAttribute(
+				"aria-label",
+				nextValue ? "Remove favorite" : "Mark favorite",
+			);
+		});
 		card.addEventListener("click", (e) => {
 			if (e.target.closest(".drag-handle")) return;
+			if (e.target.closest(".fav-toggle")) return;
 			if (selectMode) {
 				toggleSelect(v.path, card);
 			} else {
@@ -870,6 +899,10 @@ listBtn.addEventListener("click", () => {
 	listBtn.classList.add("active");
 	gridBtn.classList.remove("active");
 });
+favoritesOnlyToggle.addEventListener("change", () => {
+	showFavoritesOnly = favoritesOnlyToggle.checked;
+	render();
+});
 
 // select mode
 /**
@@ -994,6 +1027,20 @@ async function deleteVideoPath(path) {
 		return { ok: false, message: await res.text() };
 	} catch (e) {
 		return { ok: false, message: "request failed" };
+	}
+}
+
+async function setFavorite(hash, favorite) {
+	if (!hash) return false;
+	try {
+		const res = await fetch("/api/favorites/set", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ hash, favorite }),
+		});
+		return res.ok;
+	} catch (e) {
+		return false;
 	}
 }
 

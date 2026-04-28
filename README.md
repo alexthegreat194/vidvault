@@ -83,7 +83,9 @@ All JSON request bodies use `Content-Type: application/json` unless noted.
 | Method & path      | Description |
 | ------------------ | ----------- |
 | `GET /`            | Single-page HTML (embedded assets). |
-| `GET /api/videos`  | JSON array of video objects (shape below). |
+| `GET /api/videos`  | JSON array of video objects (shape below), including hash and favorite state. |
+| `GET /api/favorites` | JSON object mapping `hash -> true` for favorited videos. |
+| `POST /api/favorites/set` | Body: `{ "hash": "sha256...", "favorite": true|false }` — explicitly set favorite state for a hash. |
 | `GET /api/folders` | JSON array of `{ "name": string, "has_other_files": boolean }` — one entry per directory under the root; `name` is the slash-separated path relative to the media root. |
 | `POST /api/mkdir`  | Body: `{ "folder": "relative/path" }` — create directory under the media root. |
 | `POST /api/rmdir`  | Body: `{ "folder": "relative/path" }` — move files in that folder to the root (rename on conflict), remove the folder tree. |
@@ -98,11 +100,18 @@ All JSON request bodies use `Content-Type: application/json` unless noted.
   "name": "clip.mp4",
   "path": "subfolder/clip.mp4",
   "folder": "subfolder",
-  "ext": ".mp4"
+  "ext": ".mp4",
+  "size": 12345678,
+  "modified": "2026-04-28T06:30:00Z",
+  "hash": "2d7d4f4b8e3a...",
+  "is_favorite": false
 }
 ```
 
 Root-level files use `"folder": "/"`.
+
+Favorites are persisted in your OS config directory under `vidvault/favorites.json`
+(resolved via Go's `os.UserConfigDir()`).
 
 ## Project layout
 

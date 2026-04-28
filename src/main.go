@@ -55,5 +55,9 @@ func main() {
 		go openBrowser(localURL)
 	}
 
-	log.Fatal(http.Serve(ln, newServer(root)))
+	srv, err := newServer(root)
+	if err != nil {
+		log.Fatalf("error: cannot initialize server: %v", err)
+	}
+	log.Fatal(http.Serve(ln, srv))
 }
