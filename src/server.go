@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -23,6 +24,7 @@ type server struct {
 	favorites   *FavoritesStore
 	tags        *TagsStore
 	collections *WatchCollectionsStore
+	videoCache  *videoScanCache
 	mux         *http.ServeMux
 }
 
@@ -50,11 +52,13 @@ func newServer(root string) (*server, error) {
 		favorites:   favorites,
 		tags:        tags,
 		collections: collections,
+		videoCache:  newVideoScanCache(),
 		mux:         http.NewServeMux(),
 	}
 	s.mux.HandleFunc("GET /favicon.svg", s.handleFavicon)
 	s.mux.HandleFunc("/", s.handleIndex)
 	s.mux.HandleFunc("/api/videos", s.handleVideos)
+	s.mux.HandleFunc("GET /api/videos/stream", s.handleVideosStream)
 	s.mux.HandleFunc("GET /api/favorites", s.handleFavorites)
 	s.mux.HandleFunc("POST /api/favorites/set", s.handleSetFavorite)
 	s.mux.HandleFunc("GET /api/tags", s.handleTags)
@@ -101,6 +105,12 @@ type statusWriter struct {
 	bytes  int
 }
 
+func (w *statusWriter) Flush() {
+	if f, ok := w.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
 func (w *statusWriter) WriteHeader(code int) {
 	w.status = code
 	w.ResponseWriter.WriteHeader(code)
@@ -141,7 +151,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 // handleVideos HTTP handler for all video metadata
 func (s *server) handleVideos(w http.ResponseWriter, r *http.Request) {
 	logDebug(serverLog, "handling videos request")
-	videos, err := scanVideos(s.root)
+	videos, err := scanVideos(s.root, s.videoCache)
 	if err != nil {
 		serverLog.Error("failed to scan videos", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -154,6 +164,68 @@ func (s *server) handleVideos(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(videos)
 	logDebug(serverLog, "videos response sent", "count", len(videos))
+}
+
+func (s *server) applyVideoMetadata(video *Video) {
+	video.Favorite = s.favorites.IsFavorite(video.Hash)
+	video.Tags = s.tags.TagsForHash(video.Hash)
+}
+
+func (s *server) handleVideosStream(w http.ResponseWriter, r *http.Request) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/x-ndjson")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	enc := json.NewEncoder(w)
+	writeEvent := func(event string, payload any) error {
+		frame := map[string]any{
+			"type": event,
+		}
+		if payload != nil {
+			frame["payload"] = payload
+		}
+		if err := enc.Encode(frame); err != nil {
+			return err
+		}
+		flusher.Flush()
+		return nil
+	}
+
+	start := time.Now()
+	if err := writeEvent("scan_start", map[string]any{
+		"started_at": start.UTC().Format(time.RFC3339Nano),
+	}); err != nil {
+		return
+	}
+
+	count := 0
+	_, err := scanVideosWithCallback(s.root, s.videoCache, func(video Video) error {
+		select {
+		case <-r.Context().Done():
+			return r.Context().Err()
+		default:
+		}
+		s.applyVideoMetadata(&video)
+		count++
+		return writeEvent("video", video)
+	})
+	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			return
+		}
+		serverLog.Error("failed streaming videos scan", "error", err)
+		writeEvent("scan_error", map[string]any{"message": err.Error()})
+		return
+	}
+	_ = writeEvent("scan_complete", map[string]any{
+		"count":       count,
+		"duration_ms": time.Since(start).Milliseconds(),
+	})
 }
 
 func (s *server) handleFavorites(w http.ResponseWriter, r *http.Request) {

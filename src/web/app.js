@@ -33,11 +33,19 @@ const gallery = document.getElementById("gallery"),
 	sidebarTagCancel = document.getElementById("sidebar-tag-cancel"),
 	newCollectionBtn = document.getElementById("new-collection-btn"),
 	sidebarCollectionForm = document.getElementById("sidebar-collection-form"),
-	sidebarCollectionInput = document.getElementById("sidebar-collection-input"),
-	sidebarCollectionConfirm = document.getElementById("sidebar-collection-confirm"),
-	sidebarCollectionCancel = document.getElementById("sidebar-collection-cancel"),
+	sidebarCollectionInput = document.getElementById(
+		"sidebar-collection-input",
+	),
+	sidebarCollectionConfirm = document.getElementById(
+		"sidebar-collection-confirm",
+	),
+	sidebarCollectionCancel = document.getElementById(
+		"sidebar-collection-cancel",
+	),
 	collectionList = document.getElementById("collection-list"),
-	collectionsCollapseBtn = document.getElementById("collections-collapse-btn"),
+	collectionsCollapseBtn = document.getElementById(
+		"collections-collapse-btn",
+	),
 	tagsCollapseBtn = document.getElementById("tags-collapse-btn"),
 	foldersCollapseBtn = document.getElementById("folders-collapse-btn"),
 	tagsSection = tagsCollapseBtn.closest(".sidebar-section"),
@@ -62,22 +70,42 @@ const gallery = document.getElementById("gallery"),
 	tagNewBtn = document.getElementById("tag-new-btn"),
 	selectCollectionBtn = document.getElementById("select-collection-btn"),
 	collectionPickerModal = document.getElementById("collection-picker-modal"),
-	collectionPickerSubtitle = document.getElementById("collection-picker-subtitle"),
-	collectionPickerOptions = document.getElementById("collection-picker-options"),
+	collectionPickerSubtitle = document.getElementById(
+		"collection-picker-subtitle",
+	),
+	collectionPickerOptions = document.getElementById(
+		"collection-picker-options",
+	),
 	collectionPickerClose = document.getElementById("collection-picker-close"),
-	collectionPickerCancelBtn = document.getElementById("collection-picker-cancel-btn"),
-	collectionPickerConfirmBtn = document.getElementById("collection-picker-confirm-btn"),
-	collectionPickerNewInput = document.getElementById("collection-picker-new-input"),
-	collectionPickerNewBtn = document.getElementById("collection-picker-new-btn"),
+	collectionPickerCancelBtn = document.getElementById(
+		"collection-picker-cancel-btn",
+	),
+	collectionPickerConfirmBtn = document.getElementById(
+		"collection-picker-confirm-btn",
+	),
+	collectionPickerNewInput = document.getElementById(
+		"collection-picker-new-input",
+	),
+	collectionPickerNewBtn = document.getElementById(
+		"collection-picker-new-btn",
+	),
 	watchCollectionModal = document.getElementById("watch-collection-modal"),
 	watchCollectionTitle = document.getElementById("watch-collection-title"),
-	watchCollectionSubtitle = document.getElementById("watch-collection-subtitle"),
+	watchCollectionSubtitle = document.getElementById(
+		"watch-collection-subtitle",
+	),
 	watchCollectionBody = document.getElementById("watch-collection-body"),
 	watchCollectionClose = document.getElementById("watch-collection-close"),
-	watchCollectionDeleteBtn = document.getElementById("watch-collection-delete-btn"),
-	watchCollectionRenameBtn = document.getElementById("watch-collection-rename-btn");
+	watchCollectionDeleteBtn = document.getElementById(
+		"watch-collection-delete-btn",
+	),
+	watchCollectionRenameBtn = document.getElementById(
+		"watch-collection-rename-btn",
+	);
 
 let ALL_VIDEOS = [],
+	DISCOVERED_VIDEOS = [],
+	DOWNLOADED_VIDEOS = [],
 	ALL_FOLDERS = [],
 	FOLDER_META = {},
 	ALL_TAGS = [],
@@ -95,6 +123,7 @@ let DUPLICATE_GROUPS = [],
 	duplicateBannerDismissed = false,
 	autoOpenedDuplicates = false;
 let showFavoritesOnly = false;
+let isVideoDiscoveryLoading = false;
 let tagTargetPaths = [];
 let activeCollectionID = "";
 let collectionPickerTargetHashes = [];
@@ -125,8 +154,7 @@ function parseTags(data) {
 }
 
 function parseCollections(data) {
-	const raw =
-		data && Array.isArray(data.collections) ? data.collections : [];
+	const raw = data && Array.isArray(data.collections) ? data.collections : [];
 	ALL_COLLECTIONS = raw.map((c) => ({
 		id: c.id,
 		name: c.name,
@@ -140,8 +168,50 @@ function parseCollections(data) {
 	}
 }
 
+function rebuildAllVideos() {
+	const mergedByPath = new Map();
+	for (const video of DOWNLOADED_VIDEOS) {
+		if (video && video.path) mergedByPath.set(video.path, video);
+	}
+	for (const video of DISCOVERED_VIDEOS) {
+		if (video && video.path) mergedByPath.set(video.path, video);
+	}
+	ALL_VIDEOS = [...mergedByPath.values()];
+}
+
+function setDiscoveredVideos(videos) {
+	DISCOVERED_VIDEOS = Array.isArray(videos) ? videos : [];
+	const discoveredPaths = new Set(
+		DISCOVERED_VIDEOS.map((v) => v.path).filter(Boolean),
+	);
+	DOWNLOADED_VIDEOS = DOWNLOADED_VIDEOS.filter(
+		(v) => !discoveredPaths.has(v.path),
+	);
+	rebuildAllVideos();
+}
+
+function upsertDownloadedVideo(video) {
+	if (!video || !video.path) return;
+	const idx = DOWNLOADED_VIDEOS.findIndex((v) => v.path === video.path);
+	if (idx >= 0) DOWNLOADED_VIDEOS[idx] = video;
+	else DOWNLOADED_VIDEOS.push(video);
+	rebuildAllVideos();
+}
+
+function refreshDerivedUI(mayAutoOpenDuplicates) {
+	computeDuplicateGroups();
+	buildTagNav();
+	buildFolderNav();
+	buildCollectionNav();
+	render();
+	updateDuplicateBanner(Boolean(mayAutoOpenDuplicates));
+	populateUploadFolders();
+}
+
 function tagCountByID(tagID) {
-	return ALL_VIDEOS.filter((v) => Array.isArray(v.tags) && v.tags.includes(tagID)).length;
+	return ALL_VIDEOS.filter(
+		(v) => Array.isArray(v.tags) && v.tags.includes(tagID),
+	).length;
 }
 
 function renderTagChip(tag) {
@@ -165,46 +235,85 @@ function renderVideoTagChips(tagIDs) {
 	return '<div class="card-tags">' + chips + "</div>";
 }
 
-
-
 async function init() {
-	const [vr, fr, tr, cr] = await Promise.all([
-		fetch("/api/videos"),
+	const [fr, tr, cr] = await Promise.all([
 		fetch("/api/folders"),
 		fetch("/api/tags"),
 		fetch("/api/collections"),
 	]);
-	ALL_VIDEOS = await vr.json();
 	parseFolders(await fr.json());
 	parseTags(await tr.json());
 	parseCollections(await cr.json());
-	computeDuplicateGroups();
-	buildTagNav();
-	buildFolderNav();
-	buildCollectionNav();
-	render();
-	updateDuplicateBanner(true);
-	populateUploadFolders();
+	setDiscoveredVideos([]);
+	refreshDerivedUI(true);
 	applyDefaultVideoFlags(modalVid);
+	await refreshVideosProgressive(true);
 }
 async function refresh() {
-	const [vr, fr, tr, cr] = await Promise.all([
-		fetch("/api/videos"),
+	const [fr, tr, cr] = await Promise.all([
 		fetch("/api/folders"),
 		fetch("/api/tags"),
 		fetch("/api/collections"),
 	]);
-	ALL_VIDEOS = await vr.json();
 	parseFolders(await fr.json());
 	parseTags(await tr.json());
 	parseCollections(await cr.json());
-	computeDuplicateGroups();
-	buildTagNav();
-	buildFolderNav();
-	buildCollectionNav();
-	render();
-	updateDuplicateBanner(false);
-	populateUploadFolders();
+	await refreshVideosProgressive(false);
+}
+
+async function refreshVideosFallback(mayAutoOpenDuplicates) {
+	const vr = await fetch("/api/videos");
+	setDiscoveredVideos(await vr.json());
+	isVideoDiscoveryLoading = false;
+	refreshDerivedUI(mayAutoOpenDuplicates);
+}
+
+async function refreshVideosProgressive(mayAutoOpenDuplicates) {
+	isVideoDiscoveryLoading = true;
+	try {
+		const res = await fetch("/api/videos/stream");
+		if (!res.ok || !res.body) {
+			await refreshVideosFallback(mayAutoOpenDuplicates);
+			return;
+		}
+		const reader = res.body.getReader();
+		const decoder = new TextDecoder();
+		let buffer = "";
+		let streamed = [];
+		let lastRenderCount = 0;
+		setDiscoveredVideos([]);
+		refreshDerivedUI(mayAutoOpenDuplicates);
+		while (true) {
+			const { value, done } = await reader.read();
+			if (done) break;
+			buffer += decoder.decode(value, { stream: true });
+			const lines = buffer.split("\n");
+			buffer = lines.pop() || "";
+			for (const line of lines) {
+				const trimmed = line.trim();
+				if (!trimmed) continue;
+				let event;
+				try {
+					event = JSON.parse(trimmed);
+				} catch (e) {
+					continue;
+				}
+				if (event.type === "video" && event.payload) {
+					streamed.push(event.payload);
+					if (streamed.length - lastRenderCount >= 20) {
+						setDiscoveredVideos(streamed);
+						refreshDerivedUI(false);
+						lastRenderCount = streamed.length;
+					}
+				}
+			}
+		}
+		setDiscoveredVideos(streamed);
+		isVideoDiscoveryLoading = false;
+		refreshDerivedUI(mayAutoOpenDuplicates);
+	} catch (e) {
+		await refreshVideosFallback(mayAutoOpenDuplicates);
+	}
 }
 
 function computeDuplicateGroups() {
@@ -231,12 +340,20 @@ function computeDuplicateGroups() {
 				members: sorted,
 				keepPath: sorted[0]?.path || "",
 			};
-		}).sort((a, b) => b.members.length - a.members.length || a.hash.localeCompare(b.hash));
+		})
+		.sort(
+			(a, b) =>
+				b.members.length - a.members.length ||
+				a.hash.localeCompare(b.hash),
+		);
 }
 
 function updateDuplicateBanner(mayAutoOpen) {
 	const groups = DUPLICATE_GROUPS.length;
-	const files = DUPLICATE_GROUPS.reduce((acc, g) => acc + g.members.length, 0);
+	const files = DUPLICATE_GROUPS.reduce(
+		(acc, g) => acc + g.members.length,
+		0,
+	);
 	if (!groups) {
 		dupBanner.classList.remove("visible");
 		duplicateBannerDismissed = false;
@@ -251,7 +368,8 @@ function updateDuplicateBanner(mayAutoOpen) {
 		" found (" +
 		files +
 		" files).";
-	const shouldShow = !duplicateBannerDismissed || dupModal.classList.contains("open");
+	const shouldShow =
+		!duplicateBannerDismissed || dupModal.classList.contains("open");
 	dupBanner.classList.toggle("visible", shouldShow);
 
 	if (mayAutoOpen && !autoOpenedDuplicates && groups > 0) {
@@ -299,9 +417,11 @@ function renderDuplicateGroups() {
 			" (" +
 			group.members.length +
 			' copies)</div><button class="btn dup-resolve-btn">Delete non-kept</button>';
-		header.querySelector(".dup-resolve-btn").addEventListener("click", async () => {
-			await resolveDuplicateGroup(group.hash);
-		});
+		header
+			.querySelector(".dup-resolve-btn")
+			.addEventListener("click", async () => {
+				await resolveDuplicateGroup(group.hash);
+			});
 		card.appendChild(header);
 
 		const list = document.createElement("div");
@@ -331,7 +451,9 @@ function renderDuplicateGroups() {
 			const radio = row.querySelector("input");
 			radio.addEventListener("change", () => {
 				group.keepPath = v.path;
-				list.querySelectorAll(".dup-item").forEach((el) => el.classList.remove("keep"));
+				list.querySelectorAll(".dup-item").forEach((el) =>
+					el.classList.remove("keep"),
+				);
 				row.classList.add("keep");
 			});
 			list.appendChild(row);
@@ -342,14 +464,15 @@ function renderDuplicateGroups() {
 }
 
 /**
- * 
+ *
  */
 function buildTagNav() {
 	tagList.innerHTML = "";
 	for (const tag of ALL_TAGS) {
 		const count = tagCountByID(tag.id);
 		const btn = document.createElement("button");
-		btn.className = "tag-btn" + (activeTagFilters.has(tag.id) ? " active" : "");
+		btn.className =
+			"tag-btn" + (activeTagFilters.has(tag.id) ? " active" : "");
 		btn.innerHTML =
 			renderTagChip(tag) +
 			'<span class="count">' +
@@ -361,17 +484,20 @@ function buildTagNav() {
 			buildTagNav();
 			render();
 		});
-		btn.querySelector(".tag-remove-btn").addEventListener("click", async (e) => {
-			e.stopPropagation();
-			if (!confirm('Delete tag "' + tag.name + '"?')) return;
-			const ok = await deleteTag(tag.id);
-			if (!ok) {
-				toast("Tag delete failed", "error");
-				return;
-			}
-			activeTagFilters.delete(tag.id);
-			await refresh();
-		});
+		btn.querySelector(".tag-remove-btn").addEventListener(
+			"click",
+			async (e) => {
+				e.stopPropagation();
+				if (!confirm('Delete tag "' + tag.name + '"?')) return;
+				const ok = await deleteTag(tag.id);
+				if (!ok) {
+					toast("Tag delete failed", "error");
+					return;
+				}
+				activeTagFilters.delete(tag.id);
+				await refresh();
+			},
+		);
 		tagList.appendChild(btn);
 	}
 }
@@ -437,9 +563,9 @@ function buildFolderNav() {
 				if (
 					!confirm(
 						'Delete folder "' +
-						f +
-						'"? All files inside will be moved to root.' +
-						warnMsg,
+							f +
+							'"? All files inside will be moved to root.' +
+							warnMsg,
 					)
 				)
 					return;
@@ -472,7 +598,8 @@ function buildCollectionNav() {
 	for (const collection of ALL_COLLECTIONS) {
 		const btn = document.createElement("button");
 		btn.className =
-			"collection-btn" + (collection.id === activeCollectionID ? " active" : "");
+			"collection-btn" +
+			(collection.id === activeCollectionID ? " active" : "");
 		btn.innerHTML =
 			'<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>' +
 			"<span>" +
@@ -483,30 +610,42 @@ function buildCollectionNav() {
 			'</span><button class="collection-rename-btn" title="Rename collection">✎</button><button class="collection-remove-btn" title="Delete collection">✕</button>';
 
 		btn.addEventListener("click", () => openWatchCollection(collection.id));
-		btn.querySelector(".collection-remove-btn").addEventListener("click", async (e) => {
-			e.stopPropagation();
-			if (!confirm('Delete collection "' + collection.name + '"?')) return;
-			const ok = await deleteCollection(collection.id);
-			if (!ok) {
-				toast("Collection delete failed", "error");
-				return;
-			}
-			if (activeCollectionID === collection.id) closeWatchCollection();
-			await refresh();
-			toast("Deleted " + collection.name, "success");
-		});
-		btn.querySelector(".collection-rename-btn").addEventListener("click", async (e) => {
-			e.stopPropagation();
-			const nextName = prompt("Rename collection", collection.name);
-			if (!nextName || !nextName.trim()) return;
-			const ok = await renameCollection(collection.id, nextName.trim());
-			if (!ok) {
-				toast("Collection rename failed", "error");
-				return;
-			}
-			await refresh();
-			if (activeCollectionID === collection.id) openWatchCollection(collection.id);
-		});
+		btn.querySelector(".collection-remove-btn").addEventListener(
+			"click",
+			async (e) => {
+				e.stopPropagation();
+				if (!confirm('Delete collection "' + collection.name + '"?'))
+					return;
+				const ok = await deleteCollection(collection.id);
+				if (!ok) {
+					toast("Collection delete failed", "error");
+					return;
+				}
+				if (activeCollectionID === collection.id)
+					closeWatchCollection();
+				await refresh();
+				toast("Deleted " + collection.name, "success");
+			},
+		);
+		btn.querySelector(".collection-rename-btn").addEventListener(
+			"click",
+			async (e) => {
+				e.stopPropagation();
+				const nextName = prompt("Rename collection", collection.name);
+				if (!nextName || !nextName.trim()) return;
+				const ok = await renameCollection(
+					collection.id,
+					nextName.trim(),
+				);
+				if (!ok) {
+					toast("Collection rename failed", "error");
+					return;
+				}
+				await refresh();
+				if (activeCollectionID === collection.id)
+					openWatchCollection(collection.id);
+			},
+		);
 		collectionList.appendChild(btn);
 	}
 }
@@ -515,11 +654,14 @@ function render() {
 	const q = searchEl.value.toLowerCase(),
 		sort = sortSel.value;
 	filtered = ALL_VIDEOS.filter((v) => {
-		const inF = activeFolder === "__all__" || (v.folder || "/") == activeFolder;
+		const inF =
+			activeFolder === "__all__" || (v.folder || "/") == activeFolder;
 		const inFav = !showFavoritesOnly || Boolean(v.is_favorite);
 		const inT =
 			activeTagFilters.size === 0 ||
-			[...activeTagFilters].every((tagID) => (v.tags || []).includes(tagID));
+			[...activeTagFilters].every((tagID) =>
+				(v.tags || []).includes(tagID),
+			);
 		const inS =
 			!q ||
 			v.name.toLowerCase().includes(q) ||
@@ -538,26 +680,40 @@ function render() {
 			return a.ext.localeCompare(b.ext) || a.name.localeCompare(b.name);
 		if (sort === "modified")
 			return (
-				new Date(a.modified || 0).getTime() - new Date(b.modified || 0).getTime() ||
+				new Date(a.modified || 0).getTime() -
+					new Date(b.modified || 0).getTime() ||
 				a.name.localeCompare(b.name)
 			);
 		if (sort === "modified-desc")
 			return (
-				new Date(b.modified || 0).getTime() - new Date(a.modified || 0).getTime() ||
+				new Date(b.modified || 0).getTime() -
+					new Date(a.modified || 0).getTime() ||
 				a.name.localeCompare(b.name)
 			);
 		if (sort === "size")
-			return (Number(a.size || 0) - Number(b.size || 0)) || a.name.localeCompare(b.name);
+			return (
+				Number(a.size || 0) - Number(b.size || 0) ||
+				a.name.localeCompare(b.name)
+			);
 		if (sort === "size-desc")
-			return (Number(b.size || 0) - Number(a.size || 0)) || a.name.localeCompare(b.name);
+			return (
+				Number(b.size || 0) - Number(a.size || 0) ||
+				a.name.localeCompare(b.name)
+			);
 		return 0;
 	});
 	statsEl.innerHTML =
 		"<b>" + filtered.length + "</b> / " + ALL_VIDEOS.length + " videos";
 	gallery.innerHTML = "";
 	if (!filtered.length) {
+		if (isVideoDiscoveryLoading && ALL_VIDEOS.length === 0) {
+			gallery.innerHTML =
+				'<div class="empty"><strong>Loading videos...</strong>Please wait while files are discovered.</div>';
+			return;
+		}
 		const otherWarn =
-			activeFolder !== "__all__" && FOLDER_META[activeFolder]?.has_other_files
+			activeFolder !== "__all__" &&
+			FOLDER_META[activeFolder]?.has_other_files
 				? '<span class="empty-warn">⚠ This folder contains non-video files that aren\'t shown here.</span>'
 				: "";
 		gallery.innerHTML =
@@ -608,7 +764,8 @@ function render() {
 		const obs = new IntersectionObserver(
 			(entries) => {
 				if (entries[0].isIntersecting) {
-					vid.src = "/video?path=" + encodeURIComponent(v.path) + "#t=2";
+					vid.src =
+						"/video?path=" + encodeURIComponent(v.path) + "#t=2";
 					vid.addEventListener(
 						"loadeddata",
 						() => vid.classList.add("loaded"),
@@ -655,7 +812,9 @@ function render() {
 			e.dataTransfer.setData("text/plain", v.path);
 			e.dataTransfer.effectAllowed = "move";
 		});
-		card.addEventListener("dragend", () => card.classList.remove("dragging"));
+		card.addEventListener("dragend", () =>
+			card.classList.remove("dragging"),
+		);
 		gallery.appendChild(card);
 	});
 }
@@ -790,10 +949,14 @@ function resolveTagTargets() {
 }
 
 function openTagModal(videoOrVideos) {
-	const videos = Array.isArray(videoOrVideos) ? videoOrVideos : [videoOrVideos];
+	const videos = Array.isArray(videoOrVideos)
+		? videoOrVideos
+		: [videoOrVideos];
 	tagTargetPaths = videos.map((v) => v.path).filter(Boolean);
 	tagSubtitle.textContent =
-		videos.length > 1 ? videos.length + " videos selected" : videos[0]?.name || "";
+		videos.length > 1
+			? videos.length + " videos selected"
+			: videos[0]?.name || "";
 	tagNewInput.value = "";
 	renderTagOptions();
 	tagModal.classList.add("open");
@@ -809,7 +972,9 @@ function renderTagOptions() {
 	const targets = resolveTagTargets();
 	if (!targets.length) return;
 	for (const tag of ALL_TAGS) {
-		const selectedCount = targets.filter((v) => (v.tags || []).includes(tag.id)).length;
+		const selectedCount = targets.filter((v) =>
+			(v.tags || []).includes(tag.id),
+		).length;
 		const allSelected = selectedCount === targets.length;
 		const partiallySelected = selectedCount > 0 && !allSelected;
 		const row = document.createElement("label");
@@ -824,10 +989,16 @@ function renderTagOptions() {
 		box.indeterminate = partiallySelected;
 		box.addEventListener("change", async () => {
 			const liveTargets = resolveTagTargets();
-			const hashes = [...new Set(liveTargets.map((v) => v.hash).filter(Boolean))];
+			const hashes = [
+				...new Set(liveTargets.map((v) => v.hash).filter(Boolean)),
+			];
 			let ok = true;
 			for (const hash of hashes) {
-				const applied = await setTagAssignment(hash, tag.id, box.checked);
+				const applied = await setTagAssignment(
+					hash,
+					tag.id,
+					box.checked,
+				);
 				if (!applied) {
 					ok = false;
 					break;
@@ -842,19 +1013,22 @@ function renderTagOptions() {
 			await refresh();
 			renderTagOptions();
 		});
-		row.querySelector(".tag-option-remove").addEventListener("click", async (e) => {
-			e.preventDefault();
-			e.stopPropagation();
-			if (!confirm('Delete tag "' + tag.name + '"?')) return;
-			const ok = await deleteTag(tag.id);
-			if (!ok) {
-				toast("Tag delete failed", "error");
-				return;
-			}
-			activeTagFilters.delete(tag.id);
-			await refresh();
-			renderTagOptions();
-		});
+		row.querySelector(".tag-option-remove").addEventListener(
+			"click",
+			async (e) => {
+				e.preventDefault();
+				e.stopPropagation();
+				if (!confirm('Delete tag "' + tag.name + '"?')) return;
+				const ok = await deleteTag(tag.id);
+				if (!ok) {
+					toast("Tag delete failed", "error");
+					return;
+				}
+				activeTagFilters.delete(tag.id);
+				await refresh();
+				renderTagOptions();
+			},
+		);
 		tagOptions.appendChild(row);
 	}
 }
@@ -900,7 +1074,9 @@ let moveTarget = null,
 function openMoveModal(v) {
 	moveTarget = v;
 	moveSubtitle.textContent =
-		selectedPaths.size > 1 ? selectedPaths.size + " items selected" : v.name;
+		selectedPaths.size > 1
+			? selectedPaths.size + " items selected"
+			: v.name;
 	moveSelectedFolder = v.folder || "/";
 	newFolderName.value = "";
 	renderFolderOptions();
@@ -973,9 +1149,9 @@ moveConfirmBtn.addEventListener("click", async () => {
 	else
 		toast(
 			"Moved " +
-			(paths.length > 1 ? paths.length + " items" : "") +
-			(paths.length > 1 ? " to " : "") +
-			moveSelectedFolder,
+				(paths.length > 1 ? paths.length + " items" : "") +
+				(paths.length > 1 ? " to " : "") +
+				moveSelectedFolder,
 			"success",
 		);
 	if (selectMode) exitSelectMode();
@@ -1143,11 +1319,11 @@ function updateSummary() {
 	const valid = uploadFiles.filter((f) => f.status !== "error").length;
 	uploadSummary.textContent = uploadFiles.length
 		? valid +
-		" of " +
-		uploadFiles.length +
-		" file" +
-		(uploadFiles.length > 1 ? "s" : "") +
-		" ready"
+			" of " +
+			uploadFiles.length +
+			" file" +
+			(uploadFiles.length > 1 ? "s" : "") +
+			" ready"
 		: "";
 	uploadStartBtn.disabled = valid === 0;
 }
@@ -1177,7 +1353,10 @@ uploadStartBtn.addEventListener("click", async () => {
 		fd.append("file", item.file);
 		fd.append("folder", dest);
 		try {
-			const res = await fetch("/api/upload", { method: "POST", body: fd });
+			const res = await fetch("/api/upload", {
+				method: "POST",
+				body: fd,
+			});
 			const results = await res.json();
 			const r = results[0];
 			if (r && r.error) {
@@ -1185,6 +1364,26 @@ uploadStartBtn.addEventListener("click", async () => {
 			} else {
 				setItemStatus(item.id, "done", "✓ done");
 				item.status = "done";
+				const guessedFolder =
+					dest && dest !== "/" && dest !== "__new__" ? dest : "/";
+				const extRaw = item.file.name.includes(".")
+					? "." + item.file.name.split(".").pop().toLowerCase()
+					: "";
+				upsertDownloadedVideo({
+					name: item.file.name,
+					path:
+						guessedFolder === "/"
+							? item.file.name
+							: guessedFolder + "/" + item.file.name,
+					folder: guessedFolder,
+					ext: extRaw,
+					size: item.file.size,
+					modified: new Date().toISOString(),
+					hash: "",
+					is_favorite: false,
+					tags: [],
+				});
+				refreshDerivedUI(false);
 			}
 		} catch (e) {
 			setItemStatus(item.id, "error", "failed");
@@ -1243,15 +1442,22 @@ function openWatchCollection(collectionID) {
 				'</span><span class="watch-tile-path">' +
 				escHtml(v.folder || "/") +
 				'</span><button class="watch-tile-remove" title="Remove from collection">✕</button></div>';
-			tile.querySelector(".watch-tile-remove").addEventListener("click", async () => {
-				const ok = await setCollectionVideo(collection.id, v.hash, false);
-				if (!ok) {
-					toast("Remove failed", "error");
-					return;
-				}
-				await refresh();
-				openWatchCollection(collection.id);
-			});
+			tile.querySelector(".watch-tile-remove").addEventListener(
+				"click",
+				async () => {
+					const ok = await setCollectionVideo(
+						collection.id,
+						v.hash,
+						false,
+					);
+					if (!ok) {
+						toast("Remove failed", "error");
+						return;
+					}
+					await refresh();
+					openWatchCollection(collection.id);
+				},
+			);
 			grid.appendChild(tile);
 		}
 		watchCollectionBody.appendChild(grid);
@@ -1263,12 +1469,10 @@ function closeWatchCollection() {
 	watchCollectionModal.classList.remove("open");
 	activeCollectionID = "";
 	buildCollectionNav();
-	watchCollectionBody
-		.querySelectorAll("video")
-		.forEach((v) => {
-			v.pause();
-			v.src = "";
-		});
+	watchCollectionBody.querySelectorAll("video").forEach((v) => {
+		v.pause();
+		v.src = "";
+	});
 }
 
 function openCollectionPicker(hashes) {
@@ -1298,7 +1502,7 @@ function renderCollectionPickerOptions() {
 			"collection-picker-option" +
 			(collection.id === collectionPickerSelectedID ? " selected" : "");
 		option.innerHTML =
-			'<span>' +
+			"<span>" +
 			escHtml(collection.name) +
 			'</span><span class="count">' +
 			countCollectionResolvedVideos(collection) +
@@ -1372,7 +1576,8 @@ selectBtn.addEventListener("click", () => {
 });
 selectMoveBtn.addEventListener("click", () => {
 	if (!selectedPaths.size) return;
-	const first = filtered.find((v) => selectedPaths.has(v.path)) || filtered[0];
+	const first =
+		filtered.find((v) => selectedPaths.has(v.path)) || filtered[0];
 	openMoveModal(first);
 });
 selectTagBtn.addEventListener("click", () => {
@@ -1667,7 +1872,8 @@ async function resolveDuplicateGroup(hash) {
 		"Delete " +
 			toDelete.length +
 			' duplicate file(s) and keep "' +
-			(group.members.find((m) => m.path === group.keepPath)?.name || "selected copy") +
+			(group.members.find((m) => m.path === group.keepPath)?.name ||
+				"selected copy") +
 			'"?',
 	);
 	if (!ok) return;
@@ -1745,7 +1951,8 @@ collectionPickerNewInput.addEventListener("keydown", (e) => {
 	if (e.key === "Enter") collectionPickerNewBtn.click();
 });
 collectionPickerConfirmBtn.addEventListener("click", async () => {
-	if (!collectionPickerSelectedID || !collectionPickerTargetHashes.length) return;
+	if (!collectionPickerSelectedID || !collectionPickerTargetHashes.length)
+		return;
 	const ok = await bulkAddCollectionVideos(
 		collectionPickerSelectedID,
 		collectionPickerTargetHashes,

@@ -3,7 +3,7 @@
 - [x] add screenshots to repo
 
 Bugs:
-- [ ] duplicate manager modal can bunch up duplicate items and hide entries; add vertical scrolling so all results are visible/reviewable
+- [x] duplicate manager modal can bunch up duplicate items and hide entries; add vertical scrolling so all results are visible/reviewable
 - [ ] initial app load has a long delay before video handling/loading works reliably
   - [ ] frontend: separate caching for downloaded videos vs discovered videos
   - [ ] backend: add caching layer for video/metadata lookups
