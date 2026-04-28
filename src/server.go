@@ -10,7 +10,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 )
 
@@ -18,7 +17,7 @@ import (
 
 // server holds the absolute path of the media root and the HTTP multiplexer.
 type server struct {
-	root string        // absolute path to the directory being served
+	root string // absolute path to the directory being served
 	mux  *http.ServeMux
 }
 
@@ -62,6 +61,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, indexHTML)
 }
 
+// handleVideos HTTP handler for all video metadata
 func (s *server) handleVideos(w http.ResponseWriter, r *http.Request) {
 	videos, err := scanVideos(s.root)
 	if err != nil {
@@ -72,6 +72,7 @@ func (s *server) handleVideos(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(videos)
 }
 
+// Handler for
 func (s *server) handleVideo(w http.ResponseWriter, r *http.Request) {
 	relPath, err := url.QueryUnescape(r.URL.Query().Get("path"))
 	if err != nil || relPath == "" {
@@ -114,49 +115,18 @@ func (s *server) handleVideo(w http.ResponseWriter, r *http.Request) {
 	http.ServeContent(w, r, filepath.Base(fileAbs), fi.ModTime(), f)
 }
 
-// folderInfo describes a subdirectory under the media root.
-// It is serialised to JSON and returned by the /api/folders endpoint.
-type folderInfo struct {
-	Name          string `json:"name"`           // slash-separated path relative to root
-	HasOtherFiles bool   `json:"has_other_files"` // true if the directory contains non-video files
-}
-
+// Http Handler for reading all the directories in a root directory
 func (s *server) handleFolders(w http.ResponseWriter, r *http.Request) {
-	seen := map[string]*folderInfo{}
-	filepath.WalkDir(s.root, func(path string, d os.DirEntry, err error) error {
-		if err != nil || path == s.root {
-			return err
-		}
-		rel, _ := filepath.Rel(s.root, path)
-		slashRel := filepath.ToSlash(rel)
-		if d.IsDir() {
-			if _, exists := seen[slashRel]; !exists {
-				seen[slashRel] = &folderInfo{Name: slashRel}
-			}
-		} else {
-			ext := strings.ToLower(filepath.Ext(path))
-			if !videoExts[ext] {
-				parent := filepath.ToSlash(filepath.Dir(rel))
-				if parent != "." {
-					if fi, exists := seen[parent]; exists {
-						fi.HasOtherFiles = true
-					} else {
-						seen[parent] = &folderInfo{Name: parent, HasOtherFiles: true}
-					}
-				}
-			}
-		}
-		return nil
-	})
-	folders := make([]folderInfo, 0, len(seen))
-	for _, fi := range seen {
-		folders = append(folders, *fi)
-	}
-	sort.Slice(folders, func(i, j int) bool { return folders[i].Name < folders[j].Name })
 	w.Header().Set("Content-Type", "application/json")
+	folders, err := getFolderMetadata(s.root)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	json.NewEncoder(w).Encode(folders)
 }
 
+// Http Handler for making a new directory
 func (s *server) handleMkdir(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -169,18 +139,9 @@ func (s *server) handleMkdir(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-	clean := filepath.Clean(filepath.FromSlash(req.Folder))
-	if strings.HasPrefix(clean, "..") {
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return
-	}
-	rootAbs, _ := filepath.Abs(s.root)
-	destAbs, err := filepath.Abs(filepath.Join(s.root, clean))
-	if err != nil || !strings.HasPrefix(destAbs, rootAbs+string(os.PathSeparator)) {
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return
-	}
-	if err := os.MkdirAll(destAbs, 0755); err != nil {
+
+	err := makeDirectory(s.root, req.Folder)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -199,38 +160,8 @@ func (s *server) handleRmdir(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-	clean := filepath.Clean(filepath.FromSlash(req.Folder))
-	if clean == "." || strings.HasPrefix(clean, "..") {
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return
-	}
-	rootAbs, _ := filepath.Abs(s.root)
-	dirAbs, err := filepath.Abs(filepath.Join(s.root, clean))
-	if err != nil || !strings.HasPrefix(dirAbs, rootAbs+string(os.PathSeparator)) {
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return
-	}
 
-	// Move all files inside the directory to root
-	err = filepath.WalkDir(dirAbs, func(path string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return err
-		}
-		dest := filepath.Join(s.root, filepath.Base(path))
-		// Avoid overwriting existing files at root
-		if _, statErr := os.Stat(dest); statErr == nil {
-			ext := filepath.Ext(filepath.Base(path))
-			base := strings.TrimSuffix(filepath.Base(path), ext)
-			dest = filepath.Join(s.root, base+"_1"+ext)
-		}
-		return os.Rename(path, dest)
-	})
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if err := os.RemoveAll(dirAbs); err != nil {
+	if err := removeDirectory(s.root, req.Folder); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -251,39 +182,7 @@ func (s *server) handleMove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	srcClean := filepath.Clean(filepath.FromSlash(req.Path))
-	if strings.HasPrefix(srcClean, "..") {
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return
-	}
-	rootAbs, _ := filepath.Abs(s.root)
-	srcAbs, err := filepath.Abs(filepath.Join(s.root, srcClean))
-	if err != nil || !strings.HasPrefix(srcAbs, rootAbs+string(os.PathSeparator)) {
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return
-	}
-
-	destFolder := filepath.Clean(filepath.FromSlash(req.DestFolder))
-	if destFolder == "." || destFolder == "/" {
-		destFolder = ""
-	}
-	if strings.HasPrefix(destFolder, "..") {
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return
-	}
-	destDir := filepath.Join(s.root, destFolder)
-	destDirAbs, err := filepath.Abs(destDir)
-	if err != nil || (!strings.HasPrefix(destDirAbs, rootAbs+string(os.PathSeparator)) && destDirAbs != rootAbs) {
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return
-	}
-
-	if err := os.MkdirAll(destDir, 0755); err != nil {
-		http.Error(w, "cannot create destination", http.StatusInternalServerError)
-		return
-	}
-	destAbs := filepath.Join(destDir, filepath.Base(srcAbs))
-	if err := os.Rename(srcAbs, destAbs); err != nil {
+	if err := moveFileToDirectory(s.root, req.Path, req.DestFolder); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

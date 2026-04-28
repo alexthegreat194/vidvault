@@ -7,8 +7,6 @@ import (
 	"strings"
 )
 
-// ── supported extensions ─────────────────────────────────────────────────────
-
 // videoExts is the set of file extensions (lowercase, dot-prefixed) recognized
 // as video files. Referenced by scanVideos, handleFolders, and uploadOne.
 var videoExts = map[string]bool{
@@ -22,8 +20,6 @@ var videoExts = map[string]bool{
 	".ogv":  true,
 }
 
-// ── video metadata ────────────────────────────────────────────────────────────
-
 // Video represents a single video file discovered under the root directory.
 // It is serialised to JSON and returned by the /api/videos endpoint.
 type Video struct {
@@ -33,7 +29,11 @@ type Video struct {
 	Ext    string `json:"ext"`    // lowercase extension including dot, e.g. ".mp4"
 }
 
-// scanVideos walks root recursively and returns all video files found, sorted
+func isValidVideoExtention(ext string) bool {
+	return !videoExts[ext] == false
+}
+
+// Walks root recursively and returns all video files found, sorted
 // by their relative path. Files with extensions not in videoExts are skipped.
 func scanVideos(root string) ([]Video, error) {
 	var videos []Video
