@@ -261,6 +261,33 @@ async function refresh() {
 	await refreshVideosProgressive(false);
 }
 
+async function refreshTagsOnly() {
+	const tr = await fetch("/api/tags");
+	parseTags(await tr.json());
+}
+
+async function refreshTagAssignmentsForHashes(hashes) {
+	const uniqueHashes = [...new Set((hashes || []).filter(Boolean))];
+	if (!uniqueHashes.length) return;
+	const res = await fetch("/api/tags/videos", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ hashes: uniqueHashes }),
+	});
+	if (!res.ok) throw new Error("failed to refresh tag assignments");
+	const payload = await res.json();
+	const updates = Array.isArray(payload?.videos) ? payload.videos : [];
+	const tagsByHash = Object.fromEntries(
+		updates.map((u) => [u.hash, Array.isArray(u.tags) ? u.tags : []]),
+	);
+	for (const video of ALL_VIDEOS) {
+		if (!video || !video.hash) continue;
+		if (Object.prototype.hasOwnProperty.call(tagsByHash, video.hash)) {
+			video.tags = tagsByHash[video.hash];
+		}
+	}
+}
+
 async function refreshVideosFallback(mayAutoOpenDuplicates) {
 	const vr = await fetch("/api/videos");
 	setDiscoveredVideos(await vr.json());
@@ -495,7 +522,22 @@ function buildTagNav() {
 					return;
 				}
 				activeTagFilters.delete(tag.id);
-				await refresh();
+				try {
+					const affectedHashes = [
+						...new Set(
+							ALL_VIDEOS.filter((v) =>
+								Array.isArray(v.tags) && v.tags.includes(tag.id),
+							)
+								.map((v) => v.hash)
+								.filter(Boolean),
+						),
+					];
+					await refreshTagsOnly();
+					await refreshTagAssignmentsForHashes(affectedHashes);
+					refreshDerivedUI(false);
+				} catch (e) {
+					await refresh();
+				}
 			},
 		);
 		tagList.appendChild(btn);
@@ -1010,7 +1052,13 @@ function renderTagOptions() {
 				renderTagOptions();
 				return;
 			}
-			await refresh();
+			try {
+				await refreshTagsOnly();
+				await refreshTagAssignmentsForHashes(hashes);
+				refreshDerivedUI(false);
+			} catch (e) {
+				await refresh();
+			}
 			renderTagOptions();
 		});
 		row.querySelector(".tag-option-remove").addEventListener(
@@ -1025,7 +1073,22 @@ function renderTagOptions() {
 					return;
 				}
 				activeTagFilters.delete(tag.id);
-				await refresh();
+				try {
+					const affectedHashes = [
+						...new Set(
+							ALL_VIDEOS.filter((v) =>
+								Array.isArray(v.tags) && v.tags.includes(tag.id),
+							)
+								.map((v) => v.hash)
+								.filter(Boolean),
+						),
+					];
+					await refreshTagsOnly();
+					await refreshTagAssignmentsForHashes(affectedHashes);
+					refreshDerivedUI(false);
+				} catch (e) {
+					await refresh();
+				}
 				renderTagOptions();
 			},
 		);
@@ -1042,7 +1105,12 @@ tagNewBtn.addEventListener("click", async () => {
 		return;
 	}
 	tagNewInput.value = "";
-	await refresh();
+	try {
+		await refreshTagsOnly();
+		refreshDerivedUI(false);
+	} catch (e) {
+		await refresh();
+	}
 	renderTagOptions();
 });
 tagNewInput.addEventListener("keydown", (e) => {
@@ -1633,7 +1701,12 @@ async function createSidebarTag() {
 	}
 	hideSidebarTagForm();
 	toast("Created tag " + name, "success");
-	await refresh();
+	try {
+		await refreshTagsOnly();
+		refreshDerivedUI(false);
+	} catch (e) {
+		await refresh();
+	}
 }
 sidebarTagConfirm.addEventListener("click", createSidebarTag);
 sidebarTagInput.addEventListener("keydown", (e) => {

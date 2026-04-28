@@ -65,6 +65,7 @@ func newServer(root string) (*server, error) {
 	s.mux.HandleFunc("POST /api/tags/create", s.handleCreateTag)
 	s.mux.HandleFunc("POST /api/tags/assign", s.handleAssignTag)
 	s.mux.HandleFunc("POST /api/tags/delete", s.handleDeleteTag)
+	s.mux.HandleFunc("POST /api/tags/videos", s.handleTagVideoAssignments)
 	s.mux.HandleFunc("GET /api/collections", s.handleCollections)
 	s.mux.HandleFunc("POST /api/collections/create", s.handleCreateCollection)
 	s.mux.HandleFunc("POST /api/collections/rename", s.handleRenameCollection)
@@ -317,6 +318,46 @@ func (s *server) handleDeleteTag(w http.ResponseWriter, r *http.Request) {
 	}
 	serverLog.Debug("tag deleted", "tag_id", req.TagID)
 	w.WriteHeader(http.StatusOK)
+}
+
+func (s *server) handleTagVideoAssignments(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Hashes []string `json:"hashes"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		serverLog.Error("failed parsing tag videos payload", "error", err)
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	type tagVideoAssignment struct {
+		Hash string   `json:"hash"`
+		Tags []string `json:"tags"`
+	}
+
+	seen := map[string]struct{}{}
+	updates := make([]tagVideoAssignment, 0, len(req.Hashes))
+	for _, hash := range req.Hashes {
+		hash = strings.TrimSpace(hash)
+		if hash == "" {
+			continue
+		}
+		if _, ok := seen[hash]; ok {
+			continue
+		}
+		seen[hash] = struct{}{}
+		updates = append(updates, tagVideoAssignment{
+			Hash: hash,
+			Tags: s.tags.TagsForHash(hash),
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(struct {
+		Videos []tagVideoAssignment `json:"videos"`
+	}{
+		Videos: updates,
+	})
 }
 
 func (s *server) handleCollections(w http.ResponseWriter, r *http.Request) {
