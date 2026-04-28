@@ -56,16 +56,16 @@ func newWatchCollectionsStore() (*WatchCollectionsStore, error) {
 		collectionsLog.Error("failed loading collections store", "path", store.path, "error", err)
 		return nil, err
 	}
-	logDebug(collectionsLog, "collections store initialized", "path", store.path, "collections", len(store.collections))
+	collectionsLog.Debug("collections store initialized", "path", store.path, "collections", len(store.collections))
 	return store, nil
 }
 
 func (s *WatchCollectionsStore) load() error {
-	logDebug(collectionsLog, "loading collections from disk", "path", s.path)
+	collectionsLog.Debug("loading collections from disk", "path", s.path)
 	raw, err := os.ReadFile(s.path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			logDebug(collectionsLog, "collections file does not exist yet", "path", s.path)
+			collectionsLog.Debug("collections file does not exist yet", "path", s.path)
 			return nil
 		}
 		return err
@@ -114,7 +114,7 @@ func (s *WatchCollectionsStore) load() error {
 			UpdatedAt:   updatedAt,
 		})
 	}
-	logDebug(collectionsLog, "collections loaded", "count", len(s.collections))
+	collectionsLog.Debug("collections loaded", "count", len(s.collections))
 	return nil
 }
 
@@ -137,7 +137,7 @@ func (s *WatchCollectionsStore) Create(name string) (WatchCollection, error) {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	logDebug(collectionsLog, "creating collection", "name", trimmed)
+	collectionsLog.Debug("creating collection", "name", trimmed)
 
 	for _, c := range s.collections {
 		if strings.EqualFold(c.Name, trimmed) {
@@ -170,7 +170,7 @@ func (s *WatchCollectionsStore) Rename(id, name string) error {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	logDebug(collectionsLog, "renaming collection", "id", id, "name", name)
+	collectionsLog.Debug("renaming collection", "id", id, "name", name)
 
 	for _, c := range s.collections {
 		if c.ID != id && strings.EqualFold(c.Name, name) {
@@ -196,7 +196,7 @@ func (s *WatchCollectionsStore) Delete(id string) error {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	logDebug(collectionsLog, "deleting collection", "id", id)
+	collectionsLog.Debug("deleting collection", "id", id)
 
 	next := make([]WatchCollection, 0, len(s.collections))
 	found := false
@@ -223,7 +223,7 @@ func (s *WatchCollectionsStore) SetVideo(id, hash string, assigned bool) error {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	logDebug(collectionsLog, "setting collection video assignment", "id", id, "hash", hash, "assigned", assigned)
+	collectionsLog.Debug("setting collection video assignment", "id", id, "hash", hash, "assigned", assigned)
 
 	for i := range s.collections {
 		if s.collections[i].ID != id {
@@ -272,7 +272,7 @@ func (s *WatchCollectionsStore) AddVideos(id string, hashes []string) error {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	logDebug(collectionsLog, "adding videos to collection", "id", id, "hash_count", len(cleanHashes))
+	collectionsLog.Debug("adding videos to collection", "id", id, "hash_count", len(cleanHashes))
 
 	for i := range s.collections {
 		if s.collections[i].ID != id {
@@ -296,7 +296,7 @@ func (s *WatchCollectionsStore) AddVideos(id string, hashes []string) error {
 }
 
 func (s *WatchCollectionsStore) persistLocked() error {
-	logDebug(collectionsLog, "persisting collections store", "path", s.path, "collections", len(s.collections))
+	collectionsLog.Debug("persisting collections store", "path", s.path, "collections", len(s.collections))
 	payloadStruct := collectionsFile{Collections: s.collections}
 	payload, err := json.MarshalIndent(payloadStruct, "", "  ")
 	if err != nil {
@@ -312,7 +312,7 @@ func (s *WatchCollectionsStore) persistLocked() error {
 		_ = os.Remove(tmpPath)
 		return err
 	}
-	logDebug(collectionsLog, "collections store persisted successfully", "path", s.path)
+	collectionsLog.Debug("collections store persisted successfully", "path", s.path)
 	return nil
 }
 

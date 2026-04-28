@@ -15,12 +15,12 @@ var browserLog = fileLogger("browser")
 func lanIP() string {
 	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
-		logDebug(browserLog, "failed to determine lan ip, falling back to localhost", "error", err)
+		browserLog.Error("failed to determine lan ip, falling back to localhost", "error", err)
 		return "localhost"
 	}
 	defer conn.Close()
 	ip := conn.LocalAddr().(*net.UDPAddr).IP.String()
-	logDebug(browserLog, "determined lan ip", "ip", ip)
+	browserLog.Debug("determined lan ip", "ip", ip)
 	return ip
 }
 
@@ -37,7 +37,7 @@ func openBrowser(url string) {
 	default:
 		cmd, args = "xdg-open", []string{url}
 	}
-	logDebug(browserLog, "opening browser", "command", cmd, "url", url)
+	browserLog.Debug("opening browser", "command", cmd, "url", url)
 	if err := exec.Command(cmd, args...).Start(); err != nil {
 		browserLog.Error("failed to open browser", "command", cmd, "url", url, "error", err)
 	}

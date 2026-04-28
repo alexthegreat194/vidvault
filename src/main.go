@@ -22,20 +22,20 @@ func main() {
 	flag.Parse()
 
 	configureLogging(*debug)
-	logDebug(mainLog, "debug mode enabled")
+	mainLog.Debug("debug mode enabled")
 
 	dir := "."
 	if flag.NArg() > 0 {
 		dir = flag.Arg(0)
 	}
-	logDebug(mainLog, "resolved input directory flag", "dir", dir)
+	mainLog.Debug("resolved input directory flag", "dir", dir)
 
 	root, err := filepath.Abs(dir)
 	if err != nil {
 		mainLog.Error("cannot resolve path", "dir", dir, "error", err)
 		os.Exit(1)
 	}
-	logDebug(mainLog, "resolved absolute root directory", "root", root)
+	mainLog.Debug("resolved absolute root directory", "root", root)
 	if fi, err := os.Stat(root); err != nil || !fi.IsDir() {
 		mainLog.Error("path is not a directory", "root", root, "error", err)
 		os.Exit(1)
@@ -47,7 +47,7 @@ func main() {
 		mainLog.Error("cannot bind to address", "address", addr, "error", err)
 		os.Exit(1)
 	}
-	logDebug(mainLog, "tcp listener created", "address", addr)
+	mainLog.Debug("tcp listener created", "address", addr)
 
 	localURL := "http://localhost:" + strconv.Itoa(*port)
 	networkURL := "http://" + lanIP() + ":" + strconv.Itoa(*port)
@@ -58,10 +58,10 @@ func main() {
 	fmt.Println()
 
 	if *disableBrowser == false {
-		logDebug(mainLog, "launching browser opener goroutine", "url", localURL)
+		mainLog.Debug("launching browser opener goroutine", "url", localURL)
 		go openBrowser(localURL)
 	} else {
-		logDebug(mainLog, "browser auto-open disabled")
+		mainLog.Debug("browser auto-open disabled")
 	}
 
 	srv, err := newServer(root)

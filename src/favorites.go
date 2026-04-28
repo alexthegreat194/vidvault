@@ -39,16 +39,16 @@ func newFavoritesStore() (*FavoritesStore, error) {
 		favoritesLog.Error("failed loading favorites store", "path", store.path, "error", err)
 		return nil, err
 	}
-	logDebug(favoritesLog, "favorites store initialized", "path", store.path, "entries", len(store.data))
+	favoritesLog.Debug("favorites store initialized", "path", store.path, "entries", len(store.data))
 	return store, nil
 }
 
 func (s *FavoritesStore) load() error {
-	logDebug(favoritesLog, "loading favorites", "path", s.path)
+	favoritesLog.Debug("loading favorites", "path", s.path)
 	raw, err := os.ReadFile(s.path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			logDebug(favoritesLog, "favorites file does not exist yet", "path", s.path)
+			favoritesLog.Debug("favorites file does not exist yet", "path", s.path)
 			return nil
 		}
 		return err
@@ -67,7 +67,7 @@ func (s *FavoritesStore) load() error {
 		}
 		s.data[hash] = true
 	}
-	logDebug(favoritesLog, "favorites loaded", "count", len(s.data))
+	favoritesLog.Debug("favorites loaded", "count", len(s.data))
 	return nil
 }
 
@@ -94,7 +94,7 @@ func (s *FavoritesStore) Snapshot() map[string]bool {
 func (s *FavoritesStore) Set(hash string, favorite bool) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	logDebug(favoritesLog, "updating favorite state", "hash", hash, "favorite", favorite)
+	favoritesLog.Debug("updating favorite state", "hash", hash, "favorite", favorite)
 
 	if favorite {
 		s.data[hash] = true
@@ -105,7 +105,7 @@ func (s *FavoritesStore) Set(hash string, favorite bool) error {
 }
 
 func (s *FavoritesStore) persistLocked() error {
-	logDebug(favoritesLog, "persisting favorites", "path", s.path, "count", len(s.data))
+	favoritesLog.Debug("persisting favorites", "path", s.path, "count", len(s.data))
 	payload, err := json.MarshalIndent(s.data, "", "  ")
 	if err != nil {
 		return err
@@ -120,6 +120,6 @@ func (s *FavoritesStore) persistLocked() error {
 		_ = os.Remove(tmpPath)
 		return err
 	}
-	logDebug(favoritesLog, "favorites persisted successfully", "path", s.path)
+	favoritesLog.Debug("favorites persisted successfully", "path", s.path)
 	return nil
 }

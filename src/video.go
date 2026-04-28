@@ -55,7 +55,7 @@ func isValidVideoExtention(ext string) bool {
 }
 
 func hashFile(path string) (string, error) {
-	logDebug(videoLog, "hashing file", "path", path)
+	videoLog.Debug("hashing file", "path", path)
 	f, err := os.Open(path)
 	if err != nil {
 		return "", err
@@ -68,7 +68,7 @@ func hashFile(path string) (string, error) {
 		return "", err
 	}
 	sum := hex.EncodeToString(hash.Sum(nil))
-	logDebug(videoLog, "hashed file", "path", path, "hash", sum)
+	videoLog.Debug("hashed file", "path", path, "hash", sum)
 	return sum, nil
 }
 
@@ -168,7 +168,7 @@ func buildVideo(root string, relPath string, ext string, info os.FileInfo) (Vide
 }
 
 func scanVideosWithCallback(root string, cache *videoScanCache, onVideo func(Video) error) ([]Video, error) {
-	logDebug(videoLog, "starting video scan", "root", root)
+	videoLog.Debug("starting video scan", "root", root)
 	var videos []Video
 	activePaths := map[string]struct{}{}
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
@@ -217,7 +217,7 @@ func scanVideosWithCallback(root string, cache *videoScanCache, onVideo func(Vid
 				return err
 			}
 		}
-		logDebug(videoLog, "video discovered", "path", video.Path, "size", info.Size(), "ext", ext)
+		videoLog.Debug("video discovered", "path", video.Path, "size", info.Size(), "ext", ext)
 		return nil
 	})
 	if err != nil {
@@ -228,7 +228,7 @@ func scanVideosWithCallback(root string, cache *videoScanCache, onVideo func(Vid
 	})
 	if cache != nil {
 		cache.prune(activePaths)
-		logDebug(videoLog, "video scan cache pruned", "cache_entries", cache.size())
+		videoLog.Debug("video scan cache pruned", "cache_entries", cache.size())
 	}
 	videoLog.Info("video scan completed", "root", root, "count", len(videos))
 	return videos, nil
@@ -241,7 +241,7 @@ func scanVideos(root string, cache *videoScanCache) ([]Video, error) {
 }
 
 func deleteVideoByPath(root string, relPath string) error {
-	logDebug(videoLog, "delete requested", "root", root, "path", relPath)
+	videoLog.Debug("delete requested", "root", root, "path", relPath)
 	if strings.TrimSpace(relPath) == "" {
 		return errEmptyVideoPath
 	}

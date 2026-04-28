@@ -33,7 +33,7 @@ var serverLog = fileLogger("server")
 // newServer constructs a server rooted at root and registers all API and
 // static routes on a fresh ServeMux.
 func newServer(root string) (*server, error) {
-	logDebug(serverLog, "initializing server", "root", root)
+	serverLog.Debug("initializing server", "root", root)
 	favorites, err := newFavoritesStore()
 	if err != nil {
 		return nil, err
@@ -85,7 +85,7 @@ func newServer(root string) (*server, error) {
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	rw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
-	logDebug(serverLog, "request started", "method", r.Method, "path", r.URL.Path, "query", r.URL.RawQuery, "remote", r.RemoteAddr)
+	serverLog.Debug("request started", "method", r.Method, "path", r.URL.Path, "query", r.URL.RawQuery, "remote", r.RemoteAddr)
 	s.mux.ServeHTTP(rw, r)
 	fields := []any{
 		"method", r.Method,
@@ -126,7 +126,7 @@ func (w *statusWriter) Write(p []byte) (int, error) {
 }
 
 func (s *server) handleFavicon(w http.ResponseWriter, r *http.Request) {
-	logDebug(serverLog, "serving favicon")
+	serverLog.Debug("serving favicon")
 	data, err := webFS.ReadFile("web/favicon.svg")
 	if err != nil {
 		serverLog.Error("favicon asset missing", "error", err)
@@ -139,7 +139,7 @@ func (s *server) handleFavicon(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
-		logDebug(serverLog, "index route not found", "path", r.URL.Path)
+		serverLog.Debug("index route not found", "path", r.URL.Path)
 		http.NotFound(w, r)
 		return
 	}
@@ -150,7 +150,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 
 // handleVideos HTTP handler for all video metadata
 func (s *server) handleVideos(w http.ResponseWriter, r *http.Request) {
-	logDebug(serverLog, "handling videos request")
+	serverLog.Debug("handling videos request")
 	videos, err := scanVideos(s.root, s.videoCache)
 	if err != nil {
 		serverLog.Error("failed to scan videos", "error", err)
@@ -163,7 +163,7 @@ func (s *server) handleVideos(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(videos)
-	logDebug(serverLog, "videos response sent", "count", len(videos))
+	serverLog.Debug("videos response sent", "count", len(videos))
 }
 
 func (s *server) applyVideoMetadata(video *Video) {
@@ -252,7 +252,7 @@ func (s *server) handleSetFavorite(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	logDebug(serverLog, "favorite updated", "hash", req.Hash, "favorite", req.Favorite)
+	serverLog.Debug("favorite updated", "hash", req.Hash, "favorite", req.Favorite)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -278,7 +278,7 @@ func (s *server) handleCreateTag(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(tag)
-	logDebug(serverLog, "tag created", "tag_id", tag.ID, "name", tag.Name)
+	serverLog.Debug("tag created", "tag_id", tag.ID, "name", tag.Name)
 }
 
 func (s *server) handleAssignTag(w http.ResponseWriter, r *http.Request) {
@@ -297,7 +297,7 @@ func (s *server) handleAssignTag(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	logDebug(serverLog, "tag assignment updated", "hash", req.Hash, "tag_id", req.TagID, "assigned", req.Assigned)
+	serverLog.Debug("tag assignment updated", "hash", req.Hash, "tag_id", req.TagID, "assigned", req.Assigned)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -315,7 +315,7 @@ func (s *server) handleDeleteTag(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	logDebug(serverLog, "tag deleted", "tag_id", req.TagID)
+	serverLog.Debug("tag deleted", "tag_id", req.TagID)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -345,7 +345,7 @@ func (s *server) handleCreateCollection(w http.ResponseWriter, r *http.Request) 
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(collection)
-	logDebug(serverLog, "collection created", "id", collection.ID, "name", collection.Name)
+	serverLog.Debug("collection created", "id", collection.ID, "name", collection.Name)
 }
 
 func (s *server) handleRenameCollection(w http.ResponseWriter, r *http.Request) {
@@ -422,7 +422,7 @@ func (s *server) handleBulkCollectionVideos(w http.ResponseWriter, r *http.Reque
 
 // Handler for
 func (s *server) handleVideo(w http.ResponseWriter, r *http.Request) {
-	logDebug(serverLog, "video request received", "query", r.URL.RawQuery)
+	serverLog.Debug("video request received", "query", r.URL.RawQuery)
 	relPath, err := url.QueryUnescape(r.URL.Query().Get("path"))
 	if err != nil || relPath == "" {
 		serverLog.Error("missing or invalid video path", "error", err)
@@ -465,7 +465,7 @@ func (s *server) handleVideo(w http.ResponseWriter, r *http.Request) {
 
 	// Serve with range support (needed for video scrubbing)
 	fi, _ := f.Stat()
-	logDebug(serverLog, "serving video file", "path", relPath, "resolved", fileAbs, "size", fi.Size(), "mime", mimeType)
+	serverLog.Debug("serving video file", "path", relPath, "resolved", fileAbs, "size", fi.Size(), "mime", mimeType)
 	http.ServeContent(w, r, filepath.Base(fileAbs), fi.ModTime(), f)
 }
 
@@ -479,7 +479,7 @@ func (s *server) handleFolders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	json.NewEncoder(w).Encode(folders)
-	logDebug(serverLog, "folder metadata response sent", "count", len(folders))
+	serverLog.Debug("folder metadata response sent", "count", len(folders))
 }
 
 // Http Handler for making a new directory
@@ -503,7 +503,7 @@ func (s *server) handleMkdir(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	logDebug(serverLog, "directory created", "folder", req.Folder)
+	serverLog.Debug("directory created", "folder", req.Folder)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -526,7 +526,7 @@ func (s *server) handleRmdir(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	logDebug(serverLog, "directory removed", "folder", req.Folder)
+	serverLog.Debug("directory removed", "folder", req.Folder)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -550,7 +550,7 @@ func (s *server) handleMove(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	logDebug(serverLog, "file moved", "path", req.Path, "dest", req.DestFolder)
+	serverLog.Debug("file moved", "path", req.Path, "dest", req.DestFolder)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -590,12 +590,12 @@ func (s *server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	var results []result
 
 	files := r.MultipartForm.File["file"]
-	logDebug(serverLog, "processing upload files", "count", len(files), "dest_dir", destDir)
+	serverLog.Debug("processing upload files", "count", len(files), "dest_dir", destDir)
 	for _, fh := range files {
 		res := uploadOne(fh, destDir)
 		results = append(results, result{Name: fh.Filename, Error: res})
 		if res == "" {
-			logDebug(serverLog, "upload succeeded", "file", fh.Filename)
+			serverLog.Debug("upload succeeded", "file", fh.Filename)
 		} else {
 			serverLog.Error("upload failed", "file", fh.Filename, "error", res)
 		}
@@ -635,7 +635,7 @@ func (s *server) handleDelete(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	logDebug(serverLog, "video deleted via api", "path", req.Path)
+	serverLog.Debug("video deleted via api", "path", req.Path)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -646,7 +646,7 @@ func uploadOne(fh *multipart.FileHeader, destDir string) string {
 	name := filepath.Base(fh.Filename)
 	ext := strings.ToLower(filepath.Ext(name))
 	if !videoExts[ext] {
-		logDebug(serverLog, "upload rejected due to unsupported extension", "file", fh.Filename, "ext", ext)
+		serverLog.Debug("upload rejected due to unsupported extension", "file", fh.Filename, "ext", ext)
 		return "unsupported type"
 	}
 	src, err := fh.Open()
@@ -664,6 +664,6 @@ func uploadOne(fh *multipart.FileHeader, destDir string) string {
 	if _, err := io.Copy(dst, src); err != nil {
 		return err.Error()
 	}
-	logDebug(serverLog, "uploaded file saved", "file", name, "dest_dir", destDir)
+	serverLog.Debug("uploaded file saved", "file", name, "dest_dir", destDir)
 	return ""
 }

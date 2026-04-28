@@ -18,7 +18,7 @@ type folderInfo struct {
 }
 
 func getFolderMetadata(root string) ([]folderInfo, error) {
-	logDebug(foldersLog, "scanning folder metadata", "root", root)
+	foldersLog.Debug("scanning folder metadata", "root", root)
 	// map of existing folder metadata
 	seen := map[string]*folderInfo{}
 
@@ -67,13 +67,13 @@ func getFolderMetadata(root string) ([]folderInfo, error) {
 		return folders[i].Name < folders[j].Name
 	})
 
-	logDebug(foldersLog, "folder metadata scan completed", "root", root, "count", len(folders))
+	foldersLog.Debug("folder metadata scan completed", "root", root, "count", len(folders))
 	return folders, nil
 }
 
 // Make a new directory in root directory with verification
 func makeDirectory(root string, dirName string) error {
-	logDebug(foldersLog, "create directory requested", "root", root, "dir", dirName)
+	foldersLog.Debug("create directory requested", "root", root, "dir", dirName)
 	clean := filepath.Clean(filepath.FromSlash(dirName))
 	if strings.HasPrefix(clean, "..") {
 		return errors.New("Directory starts with ..")
@@ -91,7 +91,7 @@ func makeDirectory(root string, dirName string) error {
 }
 
 func removeDirectory(root string, dirName string) error {
-	logDebug(foldersLog, "remove directory requested", "root", root, "dir", dirName)
+	foldersLog.Debug("remove directory requested", "root", root, "dir", dirName)
 	clean := filepath.Clean(filepath.FromSlash(dirName))
 	if clean == "." || strings.HasPrefix(clean, "..") {
 		return errors.New("Directory starts with ..")
@@ -129,7 +129,7 @@ func removeDirectory(root string, dirName string) error {
 }
 
 func moveFileToDirectory(root string, path string, dest string) error {
-	logDebug(foldersLog, "move file requested", "root", root, "path", path, "dest", dest)
+	foldersLog.Debug("move file requested", "root", root, "path", path, "dest", dest)
 	srcClean := filepath.Clean(filepath.FromSlash(path))
 	if strings.HasPrefix(srcClean, "..") {
 		return errors.New("forbidden: path attempts directory traversal")

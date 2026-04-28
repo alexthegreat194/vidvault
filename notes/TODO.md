@@ -10,6 +10,9 @@ Bugs:
   - [x] backend: stream file metadata progressively so UI updates as files are discovered
 - [ ] adding/updating tags currently triggers a full video refetch; switch to a tag-specific API flow that fetches only videos needing tag updates
 - [ ] after any select-mode operation completes, automatically disable/exit select mode
+- [ ] When selecting what tags I want, it should not rerender everything
+- [ ] creating new tags or collections should not reredner 
+- [ ] has trouble with multiple hashes
 
 Tweaks:
 - [x] add all files to top of list
@@ -25,3 +28,11 @@ keeps track of when something was uploaded, if something was uploaded before the
 - [x] the ability to delete videos: make this a super last resort and with lots of ui to stop the user from doing it
 - [x] auto detect duplicates with embeddings?
 - [ ] videos that were watched the most amount of times, ability to sort by most watched
+- [ ] master controls on collections
+- [ ] change grid width for collections
+- [ ] status bar for loading
+- [ ] thumbnail caching? cahce directory 
+- [ ] live preview
+- [ ] more info on files that dont match types
+- [ ] select button is hidden
+- [ ] Password able to be set in the ui
