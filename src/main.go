@@ -15,9 +15,14 @@ import (
 )
 
 func main() {
-	port := flag.Int("port", 8765, "port to listen on")
-	flag.IntVar(port, "p", 8765, "port to listen on (shorthand)")
+	port := flag.Int("p", 8765, "port to listen on")
+	debug := flag.Bool("d", false, "debug mode")
+	disableBrowser := flag.Bool("disable-browser", false, "disable browser opening")
 	flag.Parse()
+
+	if *debug {
+		fmt.Println("debug mode enabled...")
+	}
 
 	dir := "."
 	if flag.NArg() > 0 {
@@ -43,9 +48,12 @@ func main() {
 	fmt.Printf("\n  VIDVAULT   →  %s\n", localURL)
 	fmt.Printf("  network    →  %s\n", networkURL)
 	fmt.Printf("  scanning   →  %s\n\n", root)
-	fmt.Println("  Press Ctrl+C to stop.\n")
+	fmt.Println("  Press Ctrl+C to stop.")
+	fmt.Println()
 
-	go openBrowser(localURL)
+	if *disableBrowser == false {
+		go openBrowser(localURL)
+	}
 
 	log.Fatal(http.Serve(ln, newServer(root)))
 }

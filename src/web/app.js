@@ -43,6 +43,8 @@ function parseFolders(data) {
 	FOLDER_META = Object.fromEntries(data.map((f) => [f.name, f]));
 }
 
+
+
 async function init() {
 	const [vr, fr] = await Promise.all([
 		fetch("/api/videos"),
@@ -74,7 +76,7 @@ function buildFolderNav() {
 		...ALL_VIDEOS.map((v) => v.folder || "/"),
 		...ALL_FOLDERS,
 	]);
-	const folders = ["__all__", ...merged].sort();
+	const folders = ["__all__", ...[...merged].sort()];
 	folderList.innerHTML = "";
 	for (const f of folders) {
 		const count =
