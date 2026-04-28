@@ -1,6 +1,6 @@
 - [ ] make a brew package and investigate other package managers
 - [ ] make a demo site
-- [ ] add screenshots to repo
+- [x] add screenshots to repo
 
 Tweaks:
 - [ ] add all files to top of list
