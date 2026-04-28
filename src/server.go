@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime"
@@ -32,6 +33,7 @@ func newServer(root string) *server {
 	s.mux.HandleFunc("/api/mkdir", s.handleMkdir)
 	s.mux.HandleFunc("/api/rmdir", s.handleRmdir)
 	s.mux.HandleFunc("/api/move", s.handleMove)
+	s.mux.HandleFunc("/api/delete", s.handleDelete)
 	s.mux.HandleFunc("/api/upload", s.handleUpload)
 	s.mux.HandleFunc("/video", s.handleVideo)
 	return s
@@ -228,6 +230,37 @@ func (s *server) handleUpload(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(results)
+}
+
+func (s *server) handleDelete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Path string `json:"path"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	if err := deleteVideoByPath(s.root, req.Path); err != nil {
+		switch {
+		case errors.Is(err, errEmptyVideoPath):
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		case errors.Is(err, errForbiddenPath):
+			http.Error(w, err.Error(), http.StatusForbidden)
+		case errors.Is(err, errVideoNotFound):
+			http.Error(w, err.Error(), http.StatusNotFound)
+		case errors.Is(err, errNotAFile):
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		default:
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }
 
 // uploadOne copies a single multipart file into destDir, validating its

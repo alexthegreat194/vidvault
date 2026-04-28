@@ -22,7 +22,17 @@ const gallery = document.getElementById("gallery"),
 	sidebarFolderForm = document.getElementById("sidebar-folder-form"),
 	sidebarFolderInput = document.getElementById("sidebar-folder-input"),
 	sidebarFolderConfirm = document.getElementById("sidebar-folder-confirm"),
-	sidebarFolderCancel = document.getElementById("sidebar-folder-cancel");
+	sidebarFolderCancel = document.getElementById("sidebar-folder-cancel"),
+	dupBanner = document.getElementById("dup-banner"),
+	dupBannerText = document.getElementById("dup-banner-text"),
+	dupReviewBtn = document.getElementById("dup-review-btn"),
+	dupDismissBtn = document.getElementById("dup-dismiss-btn"),
+	dupModal = document.getElementById("dup-modal"),
+	dupSubtitle = document.getElementById("dup-subtitle"),
+	dupGroupsEl = document.getElementById("dup-groups"),
+	dupClose = document.getElementById("dup-close"),
+	dupCancelBtn = document.getElementById("dup-cancel-btn"),
+	dupResolveAllBtn = document.getElementById("dup-resolve-all-btn");
 
 let ALL_VIDEOS = [],
 	ALL_FOLDERS = [],
@@ -32,6 +42,9 @@ let ALL_VIDEOS = [],
 	currentIdx = -1;
 let selectMode = false,
 	selectedPaths = new Set();
+let DUPLICATE_GROUPS = [],
+	duplicateBannerDismissed = false,
+	autoOpenedDuplicates = false;
 
 /**
  * Populates ALL_FOLDERS (string[]) and FOLDER_META (name → folderInfo) from
@@ -52,8 +65,10 @@ async function init() {
 	]);
 	ALL_VIDEOS = await vr.json();
 	parseFolders(await fr.json());
+	computeDuplicateGroups();
 	buildFolderNav();
 	render();
+	updateDuplicateBanner(true);
 	populateUploadFolders();
 }
 async function refresh() {
@@ -63,9 +78,145 @@ async function refresh() {
 	]);
 	ALL_VIDEOS = await vr.json();
 	parseFolders(await fr.json());
+	computeDuplicateGroups();
 	buildFolderNav();
 	render();
+	updateDuplicateBanner(false);
 	populateUploadFolders();
+}
+
+function computeDuplicateGroups() {
+	const byHash = new Map();
+	for (const v of ALL_VIDEOS) {
+		if (!v.hash) continue;
+		const members = byHash.get(v.hash) || [];
+		members.push(v);
+		byHash.set(v.hash, members);
+	}
+
+	DUPLICATE_GROUPS = [...byHash.entries()]
+		.filter(([, members]) => members.length > 1)
+		.map(([hash, members]) => {
+			const sorted = [...members].sort(
+				(a, b) =>
+					new Date(b.modified || 0).getTime() -
+						new Date(a.modified || 0).getTime() ||
+					Number(b.size || 0) - Number(a.size || 0) ||
+					a.path.localeCompare(b.path),
+			);
+			return {
+				hash,
+				members: sorted,
+				keepPath: sorted[0]?.path || "",
+			};
+		}).sort((a, b) => b.members.length - a.members.length || a.hash.localeCompare(b.hash));
+}
+
+function updateDuplicateBanner(mayAutoOpen) {
+	const groups = DUPLICATE_GROUPS.length;
+	const files = DUPLICATE_GROUPS.reduce((acc, g) => acc + g.members.length, 0);
+	if (!groups) {
+		dupBanner.classList.remove("visible");
+		duplicateBannerDismissed = false;
+		autoOpenedDuplicates = false;
+		return;
+	}
+
+	dupBannerText.textContent =
+		groups +
+		" duplicate group" +
+		(groups === 1 ? "" : "s") +
+		" found (" +
+		files +
+		" files).";
+	const shouldShow = !duplicateBannerDismissed || dupModal.classList.contains("open");
+	dupBanner.classList.toggle("visible", shouldShow);
+
+	if (mayAutoOpen && !autoOpenedDuplicates && groups > 0) {
+		openDuplicateModal();
+		autoOpenedDuplicates = true;
+	}
+}
+
+function openDuplicateModal() {
+	renderDuplicateGroups();
+	dupModal.classList.add("open");
+	dupBanner.classList.add("visible");
+}
+
+function closeDuplicateModal() {
+	dupModal.classList.remove("open");
+	updateDuplicateBanner(false);
+}
+
+function renderDuplicateGroups() {
+	const groups = DUPLICATE_GROUPS.length;
+	if (!groups) {
+		dupSubtitle.textContent = "No duplicates right now.";
+		dupGroupsEl.innerHTML =
+			'<div class="dup-empty">Everything is unique. Nice and tidy.</div>';
+		dupResolveAllBtn.disabled = true;
+		return;
+	}
+
+	dupSubtitle.textContent =
+		groups + " group" + (groups === 1 ? "" : "s") + " need review";
+	dupResolveAllBtn.disabled = false;
+	dupGroupsEl.innerHTML = "";
+
+	DUPLICATE_GROUPS.forEach((group, idx) => {
+		const card = document.createElement("section");
+		card.className = "dup-group";
+		card.dataset.hash = group.hash;
+
+		const header = document.createElement("div");
+		header.className = "dup-group-header";
+		header.innerHTML =
+			'<div class="dup-group-title">Group ' +
+			(idx + 1) +
+			" (" +
+			group.members.length +
+			' copies)</div><button class="btn dup-resolve-btn">Delete non-kept</button>';
+		header.querySelector(".dup-resolve-btn").addEventListener("click", async () => {
+			await resolveDuplicateGroup(group.hash);
+		});
+		card.appendChild(header);
+
+		const list = document.createElement("div");
+		list.className = "dup-items";
+		for (const v of group.members) {
+			const isKeep = group.keepPath === v.path;
+			const row = document.createElement("label");
+			row.className = "dup-item" + (isKeep ? " keep" : "");
+			row.innerHTML =
+				'<input type="radio" name="dup-keep-' +
+				escHtml(group.hash) +
+				'" value="' +
+				escHtml(v.path) +
+				'" ' +
+				(isKeep ? "checked" : "") +
+				">" +
+				'<div class="dup-item-meta"><span class="dup-item-name">' +
+				escHtml(v.name) +
+				"</span>" +
+				'<span class="dup-item-path">' +
+				escHtml(v.folder || "/") +
+				" • " +
+				escHtml(formatBytes(v.size || 0)) +
+				" • " +
+				escHtml(formatModified(v.modified)) +
+				"</span></div>";
+			const radio = row.querySelector("input");
+			radio.addEventListener("change", () => {
+				group.keepPath = v.path;
+				list.querySelectorAll(".dup-item").forEach((el) => el.classList.remove("keep"));
+				row.classList.add("keep");
+			});
+			list.appendChild(row);
+		}
+		card.appendChild(list);
+		dupGroupsEl.appendChild(card);
+	});
 }
 
 /**
@@ -357,7 +508,8 @@ document.addEventListener("keydown", (e) => {
 
 // context menu
 const ctxMenu = document.getElementById("ctx-menu"),
-	ctxMoveEl = document.getElementById("ctx-move");
+	ctxMoveEl = document.getElementById("ctx-move"),
+	ctxDeleteEl = document.getElementById("ctx-delete");
 let ctxVideo = null;
 /**
  * Positions and shows the card context menu at the pointer location.
@@ -373,6 +525,22 @@ function showCtxMenu(e, v) {
 document.addEventListener("click", () => ctxMenu.classList.remove("open"));
 ctxMoveEl.addEventListener("click", () => {
 	if (ctxVideo) openMoveModal(ctxVideo);
+});
+ctxDeleteEl.addEventListener("click", async () => {
+	if (!ctxVideo) return;
+	const ok = confirm(
+		'Delete "' +
+			ctxVideo.name +
+			'"?\n\nThis removes the file from disk and cannot be undone.',
+	);
+	if (!ok) return;
+	const res = await deleteVideoPath(ctxVideo.path);
+	if (res.ok) {
+		toast("Deleted " + ctxVideo.name, "success");
+		await refresh();
+	} else {
+		toast("Delete failed: " + res.message, "error");
+	}
 });
 
 // move modal
@@ -814,5 +982,84 @@ function toast(msg, type = "") {
 	document.body.appendChild(el);
 	setTimeout(() => el.remove(), 3000);
 }
+
+async function deleteVideoPath(path) {
+	try {
+		const res = await fetch("/api/delete", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ path }),
+		});
+		if (res.ok) return { ok: true, message: "" };
+		return { ok: false, message: await res.text() };
+	} catch (e) {
+		return { ok: false, message: "request failed" };
+	}
+}
+
+async function resolveDuplicateGroup(hash) {
+	const group = DUPLICATE_GROUPS.find((g) => g.hash === hash);
+	if (!group || group.members.length < 2) return;
+	const toDelete = group.members.filter((m) => m.path !== group.keepPath);
+	if (!toDelete.length) return;
+	const ok = confirm(
+		"Delete " +
+			toDelete.length +
+			' duplicate file(s) and keep "' +
+			(group.members.find((m) => m.path === group.keepPath)?.name || "selected copy") +
+			'"?',
+	);
+	if (!ok) return;
+
+	let fail = 0;
+	for (const item of toDelete) {
+		const res = await deleteVideoPath(item.path);
+		if (!res.ok) fail++;
+	}
+	await refresh();
+	renderDuplicateGroups();
+	if (fail) toast(fail + " duplicate delete(s) failed", "error");
+	else toast("Duplicate group resolved", "success");
+}
+
+async function resolveAllDuplicateGroups() {
+	const actions = DUPLICATE_GROUPS.map((g) => ({
+		hash: g.hash,
+		toDelete: g.members.filter((m) => m.path !== g.keepPath),
+	}));
+	const totalDeletes = actions.reduce((acc, g) => acc + g.toDelete.length, 0);
+	if (!totalDeletes) return;
+
+	const ok = confirm(
+		"Resolve all groups by deleting " +
+			totalDeletes +
+			" file(s) and keeping your selected copy in each group?",
+	);
+	if (!ok) return;
+
+	let fail = 0;
+	for (const action of actions) {
+		for (const item of action.toDelete) {
+			const res = await deleteVideoPath(item.path);
+			if (!res.ok) fail++;
+		}
+	}
+	await refresh();
+	renderDuplicateGroups();
+	if (fail) toast(fail + " duplicate delete(s) failed", "error");
+	else toast("All duplicate groups resolved", "success");
+}
+
+dupReviewBtn.addEventListener("click", openDuplicateModal);
+dupDismissBtn.addEventListener("click", () => {
+	duplicateBannerDismissed = true;
+	dupBanner.classList.remove("visible");
+});
+dupClose.addEventListener("click", closeDuplicateModal);
+dupCancelBtn.addEventListener("click", closeDuplicateModal);
+dupModal.addEventListener("click", (e) => {
+	if (e.target === dupModal) closeDuplicateModal();
+});
+dupResolveAllBtn.addEventListener("click", resolveAllDuplicateGroups);
 
 init();
