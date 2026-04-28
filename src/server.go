@@ -20,6 +20,7 @@ import (
 type server struct {
 	root      string // absolute path to the directory being served
 	favorites *FavoritesStore
+	tags      *TagsStore
 	mux       *http.ServeMux
 }
 
@@ -30,13 +31,21 @@ func newServer(root string) (*server, error) {
 	if err != nil {
 		return nil, err
 	}
+	tags, err := newTagsStore()
+	if err != nil {
+		return nil, err
+	}
 
-	s := &server{root: root, favorites: favorites, mux: http.NewServeMux()}
+	s := &server{root: root, favorites: favorites, tags: tags, mux: http.NewServeMux()}
 	s.mux.HandleFunc("GET /favicon.svg", s.handleFavicon)
 	s.mux.HandleFunc("/", s.handleIndex)
 	s.mux.HandleFunc("/api/videos", s.handleVideos)
 	s.mux.HandleFunc("GET /api/favorites", s.handleFavorites)
 	s.mux.HandleFunc("POST /api/favorites/set", s.handleSetFavorite)
+	s.mux.HandleFunc("GET /api/tags", s.handleTags)
+	s.mux.HandleFunc("POST /api/tags/create", s.handleCreateTag)
+	s.mux.HandleFunc("POST /api/tags/assign", s.handleAssignTag)
+	s.mux.HandleFunc("POST /api/tags/delete", s.handleDeleteTag)
 	s.mux.HandleFunc("/api/folders", s.handleFolders)
 	s.mux.HandleFunc("/api/mkdir", s.handleMkdir)
 	s.mux.HandleFunc("/api/rmdir", s.handleRmdir)
@@ -80,6 +89,7 @@ func (s *server) handleVideos(w http.ResponseWriter, r *http.Request) {
 	}
 	for i := range videos {
 		videos[i].Favorite = s.favorites.IsFavorite(videos[i].Hash)
+		videos[i].Tags = s.tags.TagsForHash(videos[i].Hash)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(videos)
@@ -105,6 +115,60 @@ func (s *server) handleSetFavorite(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := s.favorites.Set(req.Hash, req.Favorite); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func (s *server) handleTags(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(s.tags.Snapshot())
+}
+
+func (s *server) handleCreateTag(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	tag, err := s.tags.Create(req.Name)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(tag)
+}
+
+func (s *server) handleAssignTag(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Hash     string `json:"hash"`
+		TagID    string `json:"tag_id"`
+		Assigned bool   `json:"assigned"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	if err := s.tags.SetAssignment(req.Hash, req.TagID, req.Assigned); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func (s *server) handleDeleteTag(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		TagID string `json:"tag_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	if err := s.tags.Delete(req.TagID); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	w.WriteHeader(http.StatusOK)

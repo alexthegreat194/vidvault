@@ -1,5 +1,6 @@
 const gallery = document.getElementById("gallery"),
 	folderList = document.getElementById("folder-list"),
+	tagList = document.getElementById("tag-list"),
 	searchEl = document.getElementById("search"),
 	statsEl = document.getElementById("stats"),
 	sortSel = document.getElementById("sort-select"),
@@ -16,6 +17,7 @@ const gallery = document.getElementById("gallery"),
 	selectBtn = document.getElementById("select-btn"),
 	selectBar = document.getElementById("select-bar"),
 	selectCount = document.getElementById("select-count"),
+	selectTagBtn = document.getElementById("select-tag-btn"),
 	selectMoveBtn = document.getElementById("select-move-btn"),
 	selectAllBtn = document.getElementById("select-all-btn"),
 	selectClearBtn = document.getElementById("select-clear-btn"),
@@ -24,6 +26,15 @@ const gallery = document.getElementById("gallery"),
 	sidebarFolderInput = document.getElementById("sidebar-folder-input"),
 	sidebarFolderConfirm = document.getElementById("sidebar-folder-confirm"),
 	sidebarFolderCancel = document.getElementById("sidebar-folder-cancel"),
+	newTagBtn = document.getElementById("new-tag-btn"),
+	sidebarTagForm = document.getElementById("sidebar-tag-form"),
+	sidebarTagInput = document.getElementById("sidebar-tag-input"),
+	sidebarTagConfirm = document.getElementById("sidebar-tag-confirm"),
+	sidebarTagCancel = document.getElementById("sidebar-tag-cancel"),
+	tagsCollapseBtn = document.getElementById("tags-collapse-btn"),
+	foldersCollapseBtn = document.getElementById("folders-collapse-btn"),
+	tagsSection = tagsCollapseBtn.closest(".sidebar-section"),
+	foldersSection = foldersCollapseBtn.closest(".sidebar-section"),
 	dupBanner = document.getElementById("dup-banner"),
 	dupBannerText = document.getElementById("dup-banner-text"),
 	dupReviewBtn = document.getElementById("dup-review-btn"),
@@ -33,11 +44,22 @@ const gallery = document.getElementById("gallery"),
 	dupGroupsEl = document.getElementById("dup-groups"),
 	dupClose = document.getElementById("dup-close"),
 	dupCancelBtn = document.getElementById("dup-cancel-btn"),
-	dupResolveAllBtn = document.getElementById("dup-resolve-all-btn");
+	dupResolveAllBtn = document.getElementById("dup-resolve-all-btn"),
+	tagModal = document.getElementById("tag-modal"),
+	tagSubtitle = document.getElementById("tag-subtitle"),
+	tagOptions = document.getElementById("tag-options"),
+	tagClose = document.getElementById("tag-close"),
+	tagCancelBtn = document.getElementById("tag-cancel-btn"),
+	tagNewInput = document.getElementById("tag-new-input"),
+	tagNewBtn = document.getElementById("tag-new-btn");
 
 let ALL_VIDEOS = [],
 	ALL_FOLDERS = [],
 	FOLDER_META = {},
+	ALL_TAGS = [],
+	TAG_ASSIGNMENTS = {},
+	TAG_MAP = {},
+	activeTagFilters = new Set(),
 	filtered = [],
 	activeFolder = "__all__",
 	currentIdx = -1;
@@ -47,6 +69,7 @@ let DUPLICATE_GROUPS = [],
 	duplicateBannerDismissed = false,
 	autoOpenedDuplicates = false;
 let showFavoritesOnly = false;
+let tagTargetPaths = [];
 
 /**
  * Populates ALL_FOLDERS (string[]) and FOLDER_META (name → folderInfo) from
@@ -58,29 +81,69 @@ function parseFolders(data) {
 	FOLDER_META = Object.fromEntries(data.map((f) => [f.name, f]));
 }
 
+function parseTags(data) {
+	ALL_TAGS = Array.isArray(data.tags) ? data.tags : [];
+	TAG_ASSIGNMENTS =
+		data && typeof data.assignments === "object" && data.assignments
+			? data.assignments
+			: {};
+	TAG_MAP = Object.fromEntries(ALL_TAGS.map((t) => [t.id, t]));
+}
+
+function tagCountByID(tagID) {
+	return ALL_VIDEOS.filter((v) => Array.isArray(v.tags) && v.tags.includes(tagID)).length;
+}
+
+function renderTagChip(tag) {
+	return (
+		'<span class="tag-chip" style="--tag-color:' +
+		escHtml(tag.color || "#888888") +
+		'">' +
+		escHtml(tag.name) +
+		"</span>"
+	);
+}
+
+function renderVideoTagChips(tagIDs) {
+	if (!Array.isArray(tagIDs) || !tagIDs.length) return "";
+	const chips = tagIDs
+		.map((id) => TAG_MAP[id])
+		.filter(Boolean)
+		.map((tag) => renderTagChip(tag))
+		.join("");
+	if (!chips) return "";
+	return '<div class="card-tags">' + chips + "</div>";
+}
+
 
 
 async function init() {
-	const [vr, fr] = await Promise.all([
+	const [vr, fr, tr] = await Promise.all([
 		fetch("/api/videos"),
 		fetch("/api/folders"),
+		fetch("/api/tags"),
 	]);
 	ALL_VIDEOS = await vr.json();
 	parseFolders(await fr.json());
+	parseTags(await tr.json());
 	computeDuplicateGroups();
+	buildTagNav();
 	buildFolderNav();
 	render();
 	updateDuplicateBanner(true);
 	populateUploadFolders();
 }
 async function refresh() {
-	const [vr, fr] = await Promise.all([
+	const [vr, fr, tr] = await Promise.all([
 		fetch("/api/videos"),
 		fetch("/api/folders"),
+		fetch("/api/tags"),
 	]);
 	ALL_VIDEOS = await vr.json();
 	parseFolders(await fr.json());
+	parseTags(await tr.json());
 	computeDuplicateGroups();
+	buildTagNav();
 	buildFolderNav();
 	render();
 	updateDuplicateBanner(false);
@@ -224,6 +287,38 @@ function renderDuplicateGroups() {
 /**
  * 
  */
+function buildTagNav() {
+	tagList.innerHTML = "";
+	for (const tag of ALL_TAGS) {
+		const count = tagCountByID(tag.id);
+		const btn = document.createElement("button");
+		btn.className = "tag-btn" + (activeTagFilters.has(tag.id) ? " active" : "");
+		btn.innerHTML =
+			renderTagChip(tag) +
+			'<span class="count">' +
+			count +
+			'</span><span class="tag-remove-btn" title="Delete tag">✕</span>';
+		btn.addEventListener("click", () => {
+			if (activeTagFilters.has(tag.id)) activeTagFilters.delete(tag.id);
+			else activeTagFilters.add(tag.id);
+			buildTagNav();
+			render();
+		});
+		btn.querySelector(".tag-remove-btn").addEventListener("click", async (e) => {
+			e.stopPropagation();
+			if (!confirm('Delete tag "' + tag.name + '"?')) return;
+			const ok = await deleteTag(tag.id);
+			if (!ok) {
+				toast("Tag delete failed", "error");
+				return;
+			}
+			activeTagFilters.delete(tag.id);
+			await refresh();
+		});
+		tagList.appendChild(btn);
+	}
+}
+
 function buildFolderNav() {
 	const merged = new Set([
 		...ALL_VIDEOS.map((v) => v.folder || "/"),
@@ -316,11 +411,14 @@ function render() {
 	filtered = ALL_VIDEOS.filter((v) => {
 		const inF = activeFolder === "__all__" || (v.folder || "/") == activeFolder;
 		const inFav = !showFavoritesOnly || Boolean(v.is_favorite);
+		const inT =
+			activeTagFilters.size === 0 ||
+			[...activeTagFilters].every((tagID) => (v.tags || []).includes(tagID));
 		const inS =
 			!q ||
 			v.name.toLowerCase().includes(q) ||
 			(v.folder || "").toLowerCase().includes(q);
-		return inF && inFav && inS;
+		return inF && inFav && inT && inS;
 	});
 	filtered.sort((a, b) => {
 		if (sort === "name") return a.name.localeCompare(b.name);
@@ -395,7 +493,9 @@ function render() {
 			escHtml(formatBytes(v.size || 0)) +
 			" • " +
 			escHtml(formatModified(v.modified)) +
-			"</span></div>";
+			"</span>" +
+			renderVideoTagChips(v.tags || []) +
+			"</div>";
 		const vid = card.querySelector("video");
 		const favBtn = card.querySelector(".fav-toggle");
 		const obs = new IntersectionObserver(
@@ -537,6 +637,7 @@ document.addEventListener("keydown", (e) => {
 
 // context menu
 const ctxMenu = document.getElementById("ctx-menu"),
+	ctxTagsEl = document.getElementById("ctx-tags"),
 	ctxMoveEl = document.getElementById("ctx-move"),
 	ctxDeleteEl = document.getElementById("ctx-delete");
 let ctxVideo = null;
@@ -552,6 +653,9 @@ function showCtxMenu(e, v) {
 	ctxMenu.classList.add("open");
 }
 document.addEventListener("click", () => ctxMenu.classList.remove("open"));
+ctxTagsEl.addEventListener("click", () => {
+	if (ctxVideo) openTagModal(ctxVideo);
+});
 ctxMoveEl.addEventListener("click", () => {
 	if (ctxVideo) openMoveModal(ctxVideo);
 });
@@ -570,6 +674,103 @@ ctxDeleteEl.addEventListener("click", async () => {
 	} else {
 		toast("Delete failed: " + res.message, "error");
 	}
+});
+
+function resolveTagTargets() {
+	return tagTargetPaths
+		.map((path) => ALL_VIDEOS.find((v) => v.path === path))
+		.filter(Boolean);
+}
+
+function openTagModal(videoOrVideos) {
+	const videos = Array.isArray(videoOrVideos) ? videoOrVideos : [videoOrVideos];
+	tagTargetPaths = videos.map((v) => v.path).filter(Boolean);
+	tagSubtitle.textContent =
+		videos.length > 1 ? videos.length + " videos selected" : videos[0]?.name || "";
+	tagNewInput.value = "";
+	renderTagOptions();
+	tagModal.classList.add("open");
+}
+
+function closeTagModal() {
+	tagModal.classList.remove("open");
+	tagTargetPaths = [];
+}
+
+function renderTagOptions() {
+	tagOptions.innerHTML = "";
+	const targets = resolveTagTargets();
+	if (!targets.length) return;
+	for (const tag of ALL_TAGS) {
+		const selectedCount = targets.filter((v) => (v.tags || []).includes(tag.id)).length;
+		const allSelected = selectedCount === targets.length;
+		const partiallySelected = selectedCount > 0 && !allSelected;
+		const row = document.createElement("label");
+		row.className = "tag-option";
+		row.innerHTML =
+			'<input type="checkbox" ' +
+			(allSelected ? "checked" : "") +
+			'><span class="tag-option-name">' +
+			renderTagChip(tag) +
+			'</span><button class="tag-option-remove" type="button">delete</button>';
+		const box = row.querySelector("input");
+		box.indeterminate = partiallySelected;
+		box.addEventListener("change", async () => {
+			const liveTargets = resolveTagTargets();
+			const hashes = [...new Set(liveTargets.map((v) => v.hash).filter(Boolean))];
+			let ok = true;
+			for (const hash of hashes) {
+				const applied = await setTagAssignment(hash, tag.id, box.checked);
+				if (!applied) {
+					ok = false;
+					break;
+				}
+			}
+			if (!ok) {
+				toast("Tag update failed", "error");
+				await refresh();
+				renderTagOptions();
+				return;
+			}
+			await refresh();
+			renderTagOptions();
+		});
+		row.querySelector(".tag-option-remove").addEventListener("click", async (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			if (!confirm('Delete tag "' + tag.name + '"?')) return;
+			const ok = await deleteTag(tag.id);
+			if (!ok) {
+				toast("Tag delete failed", "error");
+				return;
+			}
+			activeTagFilters.delete(tag.id);
+			await refresh();
+			renderTagOptions();
+		});
+		tagOptions.appendChild(row);
+	}
+}
+
+tagNewBtn.addEventListener("click", async () => {
+	const name = tagNewInput.value.trim();
+	if (!name) return;
+	const created = await createTag(name);
+	if (!created) {
+		toast("Tag create failed", "error");
+		return;
+	}
+	tagNewInput.value = "";
+	await refresh();
+	renderTagOptions();
+});
+tagNewInput.addEventListener("keydown", (e) => {
+	if (e.key === "Enter") tagNewBtn.click();
+});
+tagClose.addEventListener("click", closeTagModal);
+tagCancelBtn.addEventListener("click", closeTagModal);
+tagModal.addEventListener("click", (e) => {
+	if (e.target === tagModal) closeTagModal();
 });
 
 // move modal
@@ -951,6 +1152,12 @@ selectMoveBtn.addEventListener("click", () => {
 	const first = filtered.find((v) => selectedPaths.has(v.path)) || filtered[0];
 	openMoveModal(first);
 });
+selectTagBtn.addEventListener("click", () => {
+	if (!selectedPaths.size) return;
+	const targets = filtered.filter((v) => selectedPaths.has(v.path));
+	if (!targets.length) return;
+	openTagModal(targets);
+});
 selectAllBtn.addEventListener("click", () => {
 	filtered.forEach((v) => selectedPaths.add(v.path));
 	document.querySelectorAll(".card").forEach((c) => {
@@ -965,6 +1172,42 @@ selectClearBtn.addEventListener("click", () => {
 		.querySelectorAll(".card.selected")
 		.forEach((c) => c.classList.remove("selected"));
 	updateSelectBar();
+});
+
+// tags (sidebar)
+newTagBtn.addEventListener("click", () => {
+	sidebarTagForm.classList.add("visible");
+	sidebarTagInput.value = "";
+	sidebarTagInput.focus();
+});
+function hideSidebarTagForm() {
+	sidebarTagForm.classList.remove("visible");
+	sidebarTagInput.value = "";
+}
+sidebarTagCancel.addEventListener("click", hideSidebarTagForm);
+async function createSidebarTag() {
+	const name = sidebarTagInput.value.trim();
+	if (!name) return;
+	const created = await createTag(name);
+	if (!created) {
+		toast("Failed: tag already exists or request failed", "error");
+		return;
+	}
+	hideSidebarTagForm();
+	toast("Created tag " + name, "success");
+	await refresh();
+}
+sidebarTagConfirm.addEventListener("click", createSidebarTag);
+sidebarTagInput.addEventListener("keydown", (e) => {
+	if (e.key === "Enter") createSidebarTag();
+	if (e.key === "Escape") hideSidebarTagForm();
+});
+
+tagsCollapseBtn.addEventListener("click", () => {
+	tagsSection.classList.toggle("collapsed");
+});
+foldersCollapseBtn.addEventListener("click", () => {
+	foldersSection.classList.toggle("collapsed");
 });
 
 // new folder (sidebar)
@@ -1037,6 +1280,46 @@ async function setFavorite(hash, favorite) {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ hash, favorite }),
+		});
+		return res.ok;
+	} catch (e) {
+		return false;
+	}
+}
+
+async function createTag(name) {
+	try {
+		const res = await fetch("/api/tags/create", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ name }),
+		});
+		if (!res.ok) return null;
+		return await res.json();
+	} catch (e) {
+		return null;
+	}
+}
+
+async function deleteTag(tagID) {
+	try {
+		const res = await fetch("/api/tags/delete", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ tag_id: tagID }),
+		});
+		return res.ok;
+	} catch (e) {
+		return false;
+	}
+}
+
+async function setTagAssignment(hash, tagID, assigned) {
+	try {
+		const res = await fetch("/api/tags/assign", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ hash, tag_id: tagID, assigned }),
 		});
 		return res.ok;
 	} catch (e) {

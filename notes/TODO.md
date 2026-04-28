@@ -9,8 +9,10 @@ Features:
 - [x] sort by date uploaded
 - [ ] new section on the client page: "need to be sorted" or "recently added" 
 keeps track of when something was uploaded, if something was uploaded before the last was checked, it will prompt you and give you the option to move it to a folder 
-- [ ] tag videos: tag videos and search by tag. Maybe in the future have the ability to have ai pick which tags should be added to a video in the needs to be added stage
+- [x] tag videos: tag videos and search by tag.
+- [ ] auto-tagging follow-up: learn from existing tag assignments and suggest/apply tags automatically for newly added videos
 - [ ] watch collections: ability to watch videos next to each other in some type of grid
-- [ ] favorite videos: videos that were watched the most amount of times, ability to sort by most watched
-- [ ] the ability to delete videos: make this a super last resort and with lots of ui to stop the user from doing it
-- [ ] auto detect duplicates with embeddings?
+- [x] favorite videos:
+- [x] the ability to delete videos: make this a super last resort and with lots of ui to stop the user from doing it
+- [x] auto detect duplicates with embeddings?
+- [ ] videos that were watched the most amount of times, ability to sort by most watched

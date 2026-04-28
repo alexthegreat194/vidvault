@@ -46,21 +46,46 @@
 
 <div class="shell">
   <aside>
-    <div class="sidebar-header">
-      <span class="sidebar-label">Folders</span>
-      <button class="new-folder-btn" id="new-folder-btn" title="New folder">+</button>
+    <div class="sidebar-section">
+      <div class="sidebar-header" id="tags-header">
+        <span class="sidebar-label">Tags</span>
+        <div class="sidebar-actions">
+          <button class="new-folder-btn" id="new-tag-btn" title="New tag">+</button>
+          <button class="collapse-btn" id="tags-collapse-btn" title="Collapse tags">▾</button>
+        </div>
+      </div>
+      <div class="sidebar-tag-form" id="sidebar-tag-form">
+        <input id="sidebar-tag-input" placeholder="tag name…" autocomplete="off">
+        <button id="sidebar-tag-confirm" title="Create">✓</button>
+        <button id="sidebar-tag-cancel" title="Cancel">✕</button>
+      </div>
+      <div id="tag-list"></div>
     </div>
-    <div class="sidebar-folder-form" id="sidebar-folder-form">
-      <input id="sidebar-folder-input" placeholder="folder name…" autocomplete="off">
-      <button id="sidebar-folder-confirm" title="Create">✓</button>
-      <button id="sidebar-folder-cancel" title="Cancel">✕</button>
+
+    <div class="sidebar-section">
+      <div class="sidebar-header">
+        <span class="sidebar-label">Folders</span>
+        <div class="sidebar-actions">
+          <button class="new-folder-btn" id="new-folder-btn" title="New folder">+</button>
+          <button class="collapse-btn" id="folders-collapse-btn" title="Collapse folders">▾</button>
+        </div>
+      </div>
+      <div class="sidebar-folder-form" id="sidebar-folder-form">
+        <input id="sidebar-folder-input" placeholder="folder name…" autocomplete="off">
+        <button id="sidebar-folder-confirm" title="Create">✓</button>
+        <button id="sidebar-folder-cancel" title="Cancel">✕</button>
+      </div>
+      <div id="folder-list"></div>
     </div>
-    <div id="folder-list"></div>
   </aside>
   <main><div id="gallery"></div></main>
 </div>
 
 <div id="ctx-menu">
+  <div class="ctx-item" id="ctx-tags">
+    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41 11 3H4v7l9.59 9.59a2 2 0 0 0 2.82 0l4.18-4.18a2 2 0 0 0 0-2.82z"/><path d="M7 7h.01"/></svg>
+    Edit tags…
+  </div>
   <div class="ctx-item" id="ctx-move">
     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 9l4-4 4 4"/><path d="M9 5v14"/><path d="M19 15l-4 4-4-4"/><path d="M15 19V5"/></svg>
     Move to folder…
@@ -121,6 +146,28 @@
   </div>
 </div>
 
+<div id="tag-modal">
+  <div class="tag-inner">
+    <div class="tag-header">
+      <div>
+        <div class="tag-title">Edit tags</div>
+        <div class="tag-subtitle" id="tag-subtitle"></div>
+      </div>
+      <button class="close-btn" id="tag-close">✕</button>
+    </div>
+    <div class="tag-body">
+      <div class="tag-new-row">
+        <input id="tag-new-input" placeholder="+ new tag name…" autocomplete="off">
+        <button class="btn" id="tag-new-btn">Create</button>
+      </div>
+      <div id="tag-options"></div>
+    </div>
+    <div class="tag-footer">
+      <button class="btn" id="tag-cancel-btn">Close</button>
+    </div>
+  </div>
+</div>
+
 <div id="dup-modal">
   <div class="dup-inner">
     <div class="dup-header">
@@ -155,6 +202,7 @@
 
 <div class="select-bar" id="select-bar">
   <span class="select-count" id="select-count">0 selected</span>
+  <button class="btn" id="select-tag-btn">Tags…</button>
   <button class="btn active" id="select-move-btn">Move…</button>
   <button class="btn" id="select-all-btn">All</button>
   <button class="btn" id="select-clear-btn">Clear</button>

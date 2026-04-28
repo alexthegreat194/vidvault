@@ -66,7 +66,8 @@ The process inside the container uses port `8765`; map your host port with `-p H
 | Area         | What you get                                                                 |
 | ------------ | ----------------------------------------------------------------------------- |
 | **Gallery**  | Grid or list view, search filter, sort by name / folder / extension            |
-| **Folders**  | Sidebar; create folders; drag-and-drop onto a folder; delete folder (moves files to root, renames on collision) |
+| **Folders**  | Sidebar; create folders; drag-and-drop onto a folder; delete folder (moves files to root, renames on collision); collapsible section |
+| **Tags**     | Sidebar tags with generated colors, per-tag counts, multi-select filtering, and per-video tag assignment |
 | **Player**   | Modal lightbox; prev/next and keyboard arrows; streaming with `Accept-Ranges` |
 | **Selection**| Select mode, select all / clear, move many files at once                     |
 | **Upload**   | Modal upload with optional destination or new folder; server validates video types only |
@@ -86,6 +87,10 @@ All JSON request bodies use `Content-Type: application/json` unless noted.
 | `GET /api/videos`  | JSON array of video objects (shape below), including hash and favorite state. |
 | `GET /api/favorites` | JSON object mapping `hash -> true` for favorited videos. |
 | `POST /api/favorites/set` | Body: `{ "hash": "sha256...", "favorite": true|false }` — explicitly set favorite state for a hash. |
+| `GET /api/tags` | JSON object with `tags` and `assignments` (`hash -> [tag_id...]`). |
+| `POST /api/tags/create` | Body: `{ "name": "..." }` — create a tag with a generated color. |
+| `POST /api/tags/assign` | Body: `{ "hash": "sha256...", "tag_id": "tag_...", "assigned": true|false }` — apply/remove a tag for one video hash. |
+| `POST /api/tags/delete` | Body: `{ "tag_id": "tag_..." }` — delete tag and clean assignments. |
 | `GET /api/folders` | JSON array of `{ "name": string, "has_other_files": boolean }` — one entry per directory under the root; `name` is the slash-separated path relative to the media root. |
 | `POST /api/mkdir`  | Body: `{ "folder": "relative/path" }` — create directory under the media root. |
 | `POST /api/rmdir`  | Body: `{ "folder": "relative/path" }` — move files in that folder to the root (rename on conflict), remove the folder tree. |
@@ -104,7 +109,8 @@ All JSON request bodies use `Content-Type: application/json` unless noted.
   "size": 12345678,
   "modified": "2026-04-28T06:30:00Z",
   "hash": "2d7d4f4b8e3a...",
-  "is_favorite": false
+  "is_favorite": false,
+  "tags": ["tag_e319d...."]
 }
 ```
 
@@ -112,6 +118,10 @@ Root-level files use `"folder": "/"`.
 
 Favorites are persisted in your OS config directory under `vidvault/favorites.json`
 (resolved via Go's `os.UserConfigDir()`).
+
+Tags are persisted in `vidvault/tags.json` in that same config directory. The file
+contains tag definitions (including color) and hash-based tag assignments, so tags
+follow file moves/renames.
 
 ## Project layout
 
