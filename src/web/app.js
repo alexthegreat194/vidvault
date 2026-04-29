@@ -904,8 +904,19 @@ function render() {
 			);
 		return 0;
 	});
-	statsEl.innerHTML =
+	const filteredCountMarkup =
 		"<b>" + filtered.length + "</b> / " + ALL_VIDEOS.length + " videos";
+	if (isVideoDiscoveryLoading) {
+		statsEl.innerHTML =
+			'<div class="stats-loading">' +
+			'<span class="stats-loading-label">' +
+			filteredCountMarkup +
+			" · scanning library (" +
+			ALL_VIDEOS.length +
+			' found)</span><span class="stats-loading-bar" aria-hidden="true"><span class="stats-loading-fill"></span></span></div>';
+	} else {
+		statsEl.innerHTML = filteredCountMarkup;
+	}
 	gallery.innerHTML = "";
 	if (!filtered.length) {
 		if (isVideoDiscoveryLoading && ALL_VIDEOS.length === 0) {

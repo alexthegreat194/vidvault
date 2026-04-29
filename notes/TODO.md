@@ -40,7 +40,7 @@ keeps track of when something was uploaded, if something was uploaded before the
 - [x] Tag tweaks:
   - [x] for tags: instead of checkboxes, do a mass add/remove and an endpoint to do it in bulk, similar to how we do in the mass sort
 
-- [ ] status bar for loading
+- [x] status bar for loading
 - [ ] thumbnail caching? cahce directory 
 - [ ] live preview
 - [ ] more info on files that dont match types
