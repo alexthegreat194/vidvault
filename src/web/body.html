@@ -6,6 +6,18 @@
   <div class="logo">VID<span>VAULT</span></div>
   <div class="stats" id="stats"></div>
   <div class="controls">
+    <label class="favorites-only-toggle" title="Show favorites only">
+      <span class="favorites-switch">
+        <input type="checkbox" id="favorites-only-toggle" class="favorites-switch-input">
+        <span class="favorites-switch-ui" aria-hidden="true">
+          <span class="favorites-switch-track"></span>
+          <span class="favorites-switch-thumb">
+            <svg class="favorites-switch-star" xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l2.4 7.4h7.6l-6 4.6 2.3 7-6.3-4.6-6.3 4.6 2.3-7-6-4.6h7.6z"/></svg>
+          </span>
+        </span>
+      </span>
+      <span class="favorites-only-label">Favorites only</span>
+    </label>
     <div class="search-wrap">
       <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
       <input id="search" type="search" placeholder="filter files…" autocomplete="off">
@@ -24,10 +36,6 @@
       <button class="btn active" id="grid-btn" title="Grid view">⊞</button>
       <button class="btn"        id="list-btn" title="List view">☰</button>
     </div>
-    <label class="favorites-only-toggle" title="Show favorites only">
-      <input type="checkbox" id="favorites-only-toggle">
-      <span>Favorites only</span>
-    </label>
     <button class="btn" id="select-btn" title="Select multiple">Select</button>
     <button class="btn upload-btn" id="open-upload-btn">
       <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -55,13 +63,13 @@
 
 <div class="shell">
   <aside>
-    <div class="sidebar-section">
+    <div class="sidebar-section" id="incoming-sidebar-section">
       <div class="sidebar-header">
         <span class="sidebar-label">Incoming</span>
       </div>
       <div id="incoming-list"></div>
       <div class="sidebar-inline-actions">
-        <button class="btn" id="incoming-mark-all-btn">Mark all reviewed</button>
+        <button class="btn" id="incoming-mark-all-btn">Mark as resolved</button>
       </div>
     </div>
 
@@ -112,6 +120,11 @@
       </div>
       <div id="folder-list"></div>
     </div>
+
+    <button type="button" class="btn preview-settings-launcher" id="preview-settings-launcher" title="Preview settings" aria-label="Preview settings">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span class="preview-settings-launcher-label">settings</span>
+    </button>
   </aside>
   <main><div id="gallery"></div></main>
 </div>
@@ -252,7 +265,7 @@
     <div class="move-footer">
       <button class="btn" id="incoming-cancel-btn">Close</button>
       <button class="btn active" id="incoming-confirm-btn">Apply mass sort</button>
-      <button class="btn" id="incoming-mark-reviewed-btn">Mark all reviewed</button>
+      <button class="btn" id="incoming-mark-reviewed-btn">Mark as resolved</button>
     </div>
   </div>
 </div>
@@ -335,6 +348,25 @@
       </div>
     </div>
     <div class="watch-collection-body" id="watch-collection-body"></div>
+  </div>
+</div>
+
+<div id="preview-settings-modal">
+  <div class="preview-settings-inner">
+    <div class="preview-settings-header">
+      <div class="preview-settings-title">Preview settings</div>
+      <button type="button" class="close-btn" id="preview-settings-close" aria-label="Close">✕</button>
+    </div>
+    <div class="preview-settings-body">
+      <div class="preview-settings-row">
+        <span class="preview-settings-label">Hover preview audio</span>
+        <button type="button" class="btn" id="preview-settings-audio-toggle">Off</button>
+      </div>
+      <label class="preview-settings-row preview-settings-volume-row" for="preview-settings-volume">
+        <span class="preview-settings-label">Preview volume</span>
+        <input id="preview-settings-volume" type="range" min="0" max="1" step="0.05" value="0.5">
+      </label>
+    </div>
   </div>
 </div>
 

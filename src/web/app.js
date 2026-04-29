@@ -69,6 +69,9 @@ const gallery = document.getElementById("gallery"),
 	incomingMassSortBtn = document.getElementById("incoming-mass-sort-btn"),
 	incomingDismissBtn = document.getElementById("incoming-dismiss-btn"),
 	incomingMarkAllBtn = document.getElementById("incoming-mark-all-btn"),
+	incomingSidebarSection = document.getElementById(
+		"incoming-sidebar-section",
+	),
 	incomingModal = document.getElementById("incoming-modal"),
 	incomingSubtitle = document.getElementById("incoming-subtitle"),
 	incomingTagOptions = document.getElementById("incoming-tag-options"),
@@ -134,6 +137,17 @@ const gallery = document.getElementById("gallery"),
 	),
 	watchCollectionGridCols = document.getElementById(
 		"watch-collection-grid-cols",
+	),
+	previewSettingsModal = document.getElementById("preview-settings-modal"),
+	previewSettingsClose = document.getElementById("preview-settings-close"),
+	previewSettingsLauncher = document.getElementById(
+		"preview-settings-launcher",
+	),
+	previewSettingsAudioToggleBtn = document.getElementById(
+		"preview-settings-audio-toggle",
+	),
+	previewSettingsVolumeInput = document.getElementById(
+		"preview-settings-volume",
 	);
 
 let ALL_VIDEOS = [],
@@ -175,6 +189,23 @@ let watchCollectionMasterMuted = loadBooleanStorage(
 	WATCH_GRID_MUTED_STORAGE_KEY,
 	false,
 );
+const HOVER_PREVIEW_AUDIO_ENABLED_KEY = "vidvault.hoverPreviewAudioEnabled";
+const HOVER_PREVIEW_VOLUME_KEY = "vidvault.hoverPreviewVolume";
+const HOVER_PREVIEW_SEEK_SEC = 2;
+const PREVIEW_AUDIO_SVG_OFF =
+	'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>';
+const PREVIEW_AUDIO_SVG_ON =
+	'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>';
+let hoverPreviewAudioEnabled = loadBooleanStorage(
+	HOVER_PREVIEW_AUDIO_ENABLED_KEY,
+	false,
+);
+let hoverPreviewVolume = loadNumericStorage(
+	HOVER_PREVIEW_VOLUME_KEY,
+	0.5,
+	0,
+	1,
+);
 let collectionPickerTargetHashes = [];
 let activeIncomingFilter = false;
 let incomingSelectedFolder = "/";
@@ -212,6 +243,115 @@ function persistStorageValue(key, value) {
 	try {
 		localStorage.setItem(key, String(value));
 	} catch (e) {}
+}
+
+function applyHoverPreviewAudioToElement(videoEl) {
+	if (!videoEl || !gallery.contains(videoEl)) return;
+	videoEl.volume = hoverPreviewVolume;
+	videoEl.muted = !hoverPreviewAudioEnabled;
+}
+
+function applyHoverPreviewAudioToAll() {
+	gallery.querySelectorAll(".thumb video").forEach((v) => {
+		v.volume = hoverPreviewVolume;
+		v.muted = !hoverPreviewAudioEnabled;
+	});
+	syncPreviewSpeakerButtons();
+	syncPreviewSettingsModalUI();
+}
+
+function syncPreviewSpeakerButtons() {
+	const on = hoverPreviewAudioEnabled;
+	const title = on
+		? "Preview sound on for all cards (click to mute)"
+		: "Preview sound off (click to enable for all cards)";
+	const label = "Toggle hover preview sound for all cards";
+	const svg = on ? PREVIEW_AUDIO_SVG_ON : PREVIEW_AUDIO_SVG_OFF;
+	gallery.querySelectorAll(".preview-audio-btn").forEach((btn) => {
+		btn.classList.toggle("active", on);
+		btn.title = title;
+		btn.setAttribute("aria-label", label);
+		btn.setAttribute("aria-pressed", on ? "true" : "false");
+		btn.innerHTML = svg;
+	});
+}
+
+function syncPreviewSettingsModalUI() {
+	if (previewSettingsVolumeInput) {
+		previewSettingsVolumeInput.value = String(hoverPreviewVolume);
+	}
+	if (previewSettingsAudioToggleBtn) {
+		previewSettingsAudioToggleBtn.classList.toggle(
+			"active",
+			hoverPreviewAudioEnabled,
+		);
+		previewSettingsAudioToggleBtn.textContent = hoverPreviewAudioEnabled
+			? "On"
+			: "Off";
+	}
+}
+
+function openPreviewSettings() {
+	if (!previewSettingsModal) return;
+	syncPreviewSettingsModalUI();
+	previewSettingsModal.classList.add("open");
+}
+
+function closePreviewSettings() {
+	if (!previewSettingsModal) return;
+	previewSettingsModal.classList.remove("open");
+}
+
+function setHoverPreviewAudioEnabled(next) {
+	hoverPreviewAudioEnabled = !!next;
+	persistStorageValue(
+		HOVER_PREVIEW_AUDIO_ENABLED_KEY,
+		hoverPreviewAudioEnabled,
+	);
+	applyHoverPreviewAudioToAll();
+}
+
+function toggleHoverPreviewAudio() {
+	setHoverPreviewAudioEnabled(!hoverPreviewAudioEnabled);
+}
+
+function seekAndStartHoverPreview(card, vid) {
+	if (!vid || !vid.src || card.dataset.hoverPreview !== "1") return;
+	const doPlay = () => {
+		if (card.dataset.hoverPreview !== "1") return;
+		const dur = vid.duration;
+		if (dur && !Number.isNaN(dur) && Number.isFinite(dur)) {
+			const t = Math.min(
+				HOVER_PREVIEW_SEEK_SEC,
+				Math.max(0, dur - 0.05),
+			);
+			try {
+				vid.currentTime = t;
+			} catch (_) {}
+		}
+		applyHoverPreviewAudioToElement(vid);
+		vid.play().catch(() => {});
+	};
+	if (vid.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+		doPlay();
+	} else {
+		vid.addEventListener("loadeddata", doPlay, { once: true });
+	}
+}
+
+function stopHoverPreview(card, vid) {
+	card.dataset.hoverPreview = "0";
+	if (!vid || !vid.src) return;
+	vid.pause();
+	const dur = vid.duration;
+	if (dur && !Number.isNaN(dur) && Number.isFinite(dur)) {
+		try {
+			vid.currentTime = Math.min(
+				HOVER_PREVIEW_SEEK_SEC,
+				Math.max(0, dur - 0.05),
+			);
+		} catch (_) {}
+	}
 }
 
 /**
@@ -297,22 +437,44 @@ function countIncomingVideos() {
 function buildIncomingNav() {
 	incomingList.innerHTML = "";
 	const incomingCount = countIncomingVideos();
+	if (incomingCount === 0) {
+		activeIncomingFilter = false;
+	}
 	incomingMarkAllBtn.style.display = incomingCount > 0 ? "" : "none";
+	if (incomingSidebarSection) {
+		incomingSidebarSection.classList.toggle(
+			"incoming-sidebar--disabled",
+			incomingCount === 0,
+		);
+	}
 	const btn = document.createElement("button");
-	btn.className = "tag-btn" + (activeIncomingFilter ? " active" : "");
+	btn.type = "button";
+	btn.className =
+		"tag-btn need-sorting-nav" +
+		(activeIncomingFilter ? " active" : "");
+	btn.disabled = incomingCount === 0;
+	btn.setAttribute("aria-disabled", incomingCount === 0 ? "true" : "false");
+	btn.title =
+		incomingCount === 0
+			? "No incoming files need sorting"
+			: activeIncomingFilter
+				? "Show all videos"
+				: "Show only incoming (need sorting)";
 	btn.innerHTML =
 		'<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20"/><path d="M2 12h20"/></svg>' +
 		"<span>Need sorting</span>" +
 		'<span class="count">' +
 		incomingCount +
 		"</span>";
-	btn.addEventListener("click", () => {
-		activeIncomingFilter = !activeIncomingFilter;
-		if (activeIncomingFilter) activeFolder = "__all__";
-		buildIncomingNav();
-		buildFolderNav();
-		render();
-	});
+	if (incomingCount > 0) {
+		btn.addEventListener("click", () => {
+			activeIncomingFilter = !activeIncomingFilter;
+			if (activeIncomingFilter) activeFolder = "__all__";
+			buildIncomingNav();
+			buildFolderNav();
+			render();
+		});
+	}
 	incomingList.appendChild(btn);
 }
 
@@ -360,6 +522,7 @@ async function init() {
 	refreshDerivedUI(true);
 	applyDefaultVideoFlags(modalVid);
 	await refreshVideosProgressive(true);
+	syncPreviewSettingsModalUI();
 }
 async function refresh() {
 	const [fr, tr, cr] = await Promise.all([
@@ -703,6 +866,10 @@ function buildFolderNav() {
 			"</span>";
 		btn.addEventListener("click", () => {
 			activeFolder = f;
+			if (activeIncomingFilter) {
+				activeIncomingFilter = false;
+				buildIncomingNav();
+			}
 			document
 				.querySelectorAll(".folder-btn")
 				.forEach((b) => b.classList.remove("active"));
@@ -952,7 +1119,20 @@ function render() {
 			'">★</button>' +
 			'<div class="play-icon"><svg viewBox="0 0 36 36" fill="none"><circle cx="18" cy="18" r="17" fill="rgba(0,0,0,.55)" stroke="rgba(255,255,255,.25)" stroke-width="1"/><polygon points="14,11 27,18 14,25" fill="white"/></svg></div>' +
 			'<div class="drag-handle" title="Drag to move"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 10 18"><circle cx="3" cy="2" r="1.5" fill="white"/><circle cx="7" cy="2" r="1.5" fill="white"/><circle cx="3" cy="9" r="1.5" fill="white"/><circle cx="7" cy="9" r="1.5" fill="white"/><circle cx="3" cy="16" r="1.5" fill="white"/><circle cx="7" cy="16" r="1.5" fill="white"/></svg></div>' +
-			'<div class="check-overlay"><svg viewBox="0 0 10 8" fill="none" width="10" height="8"><polyline points="1,4 3.5,7 9,1" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>' +
+			'<div class="check-overlay"><svg viewBox="0 0 10 8" fill="none" width="10" height="8"><polyline points="1,4 3.5,7 9,1" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>' +
+			'<button type="button" class="preview-audio-btn' +
+			(hoverPreviewAudioEnabled ? " active" : "") +
+			'" title="' +
+			(hoverPreviewAudioEnabled
+				? "Preview sound on for all cards (click to mute)"
+				: "Preview sound off (click to enable for all cards)") +
+			'" aria-label="Toggle hover preview sound for all cards" aria-pressed="' +
+			(hoverPreviewAudioEnabled ? "true" : "false") +
+			'">' +
+			(hoverPreviewAudioEnabled
+				? PREVIEW_AUDIO_SVG_ON
+				: PREVIEW_AUDIO_SVG_OFF) +
+			"</button></div>" +
 			'<div class="card-meta"><span class="card-name" title="' +
 			escHtml(v.name) +
 			'">' +
@@ -980,7 +1160,9 @@ function render() {
 			"</div>";
 		const vid = card.querySelector("video");
 		applyDefaultVideoFlags(vid);
+		card.dataset.hoverPreview = "0";
 		const favBtn = card.querySelector(".fav-toggle");
+		const previewAudioBtn = card.querySelector(".preview-audio-btn");
 		const obs = new IntersectionObserver(
 			(entries) => {
 				if (entries[0].isIntersecting) {
@@ -988,7 +1170,13 @@ function render() {
 						"/video?path=" + encodeURIComponent(v.path) + "#t=2";
 					vid.addEventListener(
 						"loadeddata",
-						() => vid.classList.add("loaded"),
+						() => {
+							vid.classList.add("loaded");
+							applyHoverPreviewAudioToElement(vid);
+							if (card.dataset.hoverPreview === "1") {
+								seekAndStartHoverPreview(card, vid);
+							}
+						},
 						{ once: true },
 					);
 					obs.disconnect();
@@ -997,6 +1185,18 @@ function render() {
 			{ threshold: 0.1 },
 		);
 		obs.observe(card);
+		card.addEventListener("mouseenter", () => {
+			card.dataset.hoverPreview = "1";
+			seekAndStartHoverPreview(card, vid);
+		});
+		card.addEventListener("mouseleave", () => {
+			stopHoverPreview(card, vid);
+		});
+		previewAudioBtn.addEventListener("click", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			toggleHoverPreviewAudio();
+		});
 		favBtn.addEventListener("click", async (e) => {
 			e.preventDefault();
 			e.stopPropagation();
@@ -1017,6 +1217,7 @@ function render() {
 		card.addEventListener("click", (e) => {
 			if (e.target.closest(".drag-handle")) return;
 			if (e.target.closest(".fav-toggle")) return;
+			if (e.target.closest(".preview-audio-btn")) return;
 			if (e.target.closest(".check-overlay")) {
 				if (!selectMode) {
 					selectMode = true;
@@ -1054,7 +1255,7 @@ function render() {
 		actions.style.paddingTop = "8px";
 		const btn = document.createElement("button");
 		btn.className = "btn";
-		btn.textContent = "Mark all reviewed";
+		btn.textContent = "Mark as resolved";
 		btn.addEventListener("click", async () => {
 			const paths = filtered.map((v) => v.path).filter(Boolean);
 			if (!paths.length) return;
@@ -1120,6 +1321,9 @@ function escHtml(s) {
  * @param {number} idx
  */
 function openModal(idx) {
+	gallery.querySelectorAll(".thumb video").forEach((el) => {
+		el.pause();
+	});
 	currentIdx = idx;
 	const v = filtered[idx];
 	modalTitle.textContent = v.name;
@@ -1147,6 +1351,14 @@ modalVid.addEventListener("ended", () => {
 	if (currentIdx < filtered.length - 1) openModal(currentIdx + 1);
 });
 document.addEventListener("keydown", (e) => {
+	if (
+		e.key === "Escape" &&
+		previewSettingsModal &&
+		previewSettingsModal.classList.contains("open")
+	) {
+		closePreviewSettings();
+		return;
+	}
 	if (!modal.classList.contains("open")) return;
 	if (e.key === "Escape") closeModal();
 	if (e.key === "ArrowLeft") prevBtn.click();
@@ -2698,5 +2910,36 @@ watchCollectionRenameBtn.addEventListener("click", async () => {
 	await refresh();
 	openWatchCollection(activeCollectionID);
 });
+
+if (previewSettingsLauncher) {
+	previewSettingsLauncher.addEventListener("click", () => {
+		openPreviewSettings();
+	});
+}
+if (previewSettingsClose) {
+	previewSettingsClose.addEventListener("click", () => {
+		closePreviewSettings();
+	});
+}
+if (previewSettingsModal) {
+	previewSettingsModal.addEventListener("click", (e) => {
+		if (e.target === previewSettingsModal) closePreviewSettings();
+	});
+}
+if (previewSettingsAudioToggleBtn) {
+	previewSettingsAudioToggleBtn.addEventListener("click", () => {
+		toggleHoverPreviewAudio();
+	});
+}
+if (previewSettingsVolumeInput) {
+	previewSettingsVolumeInput.addEventListener("input", () => {
+		hoverPreviewVolume = Math.max(
+			0,
+			Math.min(1, Number(previewSettingsVolumeInput.value) || 0),
+		);
+		persistStorageValue(HOVER_PREVIEW_VOLUME_KEY, hoverPreviewVolume);
+		applyHoverPreviewAudioToAll();
+	});
+}
 
 init();
