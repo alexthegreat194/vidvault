@@ -80,7 +80,9 @@ const gallery = document.getElementById("gallery"),
 	tagModal = document.getElementById("tag-modal"),
 	tagSubtitle = document.getElementById("tag-subtitle"),
 	tagOptions = document.getElementById("tag-options"),
+	tagPendingSummary = document.getElementById("tag-pending-summary"),
 	tagClose = document.getElementById("tag-close"),
+	tagApplyBtn = document.getElementById("tag-apply-btn"),
 	tagCancelBtn = document.getElementById("tag-cancel-btn"),
 	tagNewInput = document.getElementById("tag-new-input"),
 	tagNewBtn = document.getElementById("tag-new-btn"),
@@ -157,6 +159,7 @@ let incomingBannerDismissed = false;
 let showFavoritesOnly = false;
 let isVideoDiscoveryLoading = false;
 let tagTargetPaths = [];
+let pendingTagActions = new Map();
 let activeCollectionID = "";
 const WATCH_GRID_COLS_STORAGE_KEY = "vidvault.watchGridCols";
 const WATCH_GRID_VOLUME_STORAGE_KEY = "vidvault.watchCollectionVolume";
@@ -1221,6 +1224,7 @@ function openTagModal(videoOrVideos) {
 		videos.length > 1
 			? videos.length + " videos selected"
 			: videos[0]?.name || "";
+	pendingTagActions = new Map();
 	tagNewInput.value = "";
 	renderTagOptions();
 	tagModal.classList.add("open");
@@ -1229,64 +1233,85 @@ function openTagModal(videoOrVideos) {
 function closeTagModal() {
 	tagModal.classList.remove("open");
 	tagTargetPaths = [];
+	pendingTagActions = new Map();
+}
+
+function getPendingTagActionEntries() {
+	const validTagIDs = new Set(ALL_TAGS.map((tag) => tag.id));
+	const entries = [];
+	for (const [tagID, action] of pendingTagActions.entries()) {
+		if (!validTagIDs.has(tagID)) continue;
+		if (action !== "add" && action !== "remove") continue;
+		entries.push([tagID, action]);
+	}
+	return entries;
+}
+
+function renderTagPendingSummary() {
+	const entries = getPendingTagActionEntries();
+	let addCount = 0;
+	let removeCount = 0;
+	for (const [, action] of entries) {
+		if (action === "add") addCount++;
+		if (action === "remove") removeCount++;
+	}
+	const parts = [];
+	if (addCount) parts.push(addCount + " add");
+	if (removeCount) parts.push(removeCount + " remove");
+	tagPendingSummary.textContent = parts.length
+		? "Pending: " + parts.join(", ")
+		: "No pending tag changes";
+	tagApplyBtn.disabled = entries.length === 0;
 }
 
 function renderTagOptions() {
 	tagOptions.innerHTML = "";
 	const targets = resolveTagTargets();
-	if (!targets.length) return;
+	if (!targets.length) {
+		renderTagPendingSummary();
+		return;
+	}
 	for (const tag of ALL_TAGS) {
 		const selectedCount = targets.filter((v) =>
 			(v.tags || []).includes(tag.id),
 		).length;
-		const allSelected = selectedCount === targets.length;
-		const partiallySelected = selectedCount > 0 && !allSelected;
-		const row = document.createElement("label");
+		const pendingAction = pendingTagActions.get(tag.id);
+		const row = document.createElement("div");
 		row.className = "tag-option";
+		const stateText =
+			pendingAction === "add"
+				? "pending add"
+				: pendingAction === "remove"
+					? "pending remove"
+					: selectedCount === 0
+						? "none selected"
+						: selectedCount === targets.length
+							? "all selected"
+							: selectedCount + "/" + targets.length + " selected";
 		row.innerHTML =
-			'<input type="checkbox" ' +
-			(allSelected ? "checked" : "") +
-			'><span class="tag-option-name">' +
+			'<span class="tag-option-name">' +
 			renderTagChip(tag) +
-			'</span><button class="tag-option-remove" type="button">delete</button>';
-		const box = row.querySelector("input");
-		box.indeterminate = partiallySelected;
-		box.addEventListener("change", async () => {
-			const liveTargets = resolveTagTargets();
-			const hashes = [
-				...new Set(liveTargets.map((v) => v.hash).filter(Boolean)),
-			];
-			let ok = true;
-			for (const hash of hashes) {
-				const applied = await setTagAssignment(
-					hash,
-					tag.id,
-					box.checked,
-				);
-				if (!applied) {
-					ok = false;
-					break;
-				}
-			}
-			if (!ok) {
-				toast("Tag update failed", "error");
-				await refresh();
-				renderTagOptions();
-				return;
-			}
-			try {
-				await refreshTagsOnly();
-				await refreshTagAssignmentsForHashes(hashes);
-				refreshDerivedUI(false);
-			} catch (e) {
-				await refresh();
-			}
+			'<span class="tag-option-state">' +
+			escHtml(stateText) +
+			'</span></span><button class="btn tag-option-action' +
+			(pendingAction === "add" ? " active" : "") +
+			'" type="button" data-action="add">Add</button><button class="btn tag-option-action' +
+			(pendingAction === "remove" ? " active" : "") +
+			'" type="button" data-action="remove">Remove</button><button class="tag-option-remove" type="button">delete</button>';
+		row.querySelector('[data-action="add"]').addEventListener("click", () => {
+			const prev = pendingTagActions.get(tag.id);
+			if (prev === "add") pendingTagActions.delete(tag.id);
+			else pendingTagActions.set(tag.id, "add");
 			renderTagOptions();
-			if (selectMode) {
-				closeTagModal();
-				exitSelectMode();
-			}
 		});
+		row
+			.querySelector('[data-action="remove"]')
+			.addEventListener("click", () => {
+				const prev = pendingTagActions.get(tag.id);
+				if (prev === "remove") pendingTagActions.delete(tag.id);
+				else pendingTagActions.set(tag.id, "remove");
+				renderTagOptions();
+			});
 		row.querySelector(".tag-option-remove").addEventListener(
 			"click",
 			async (e) => {
@@ -1315,11 +1340,13 @@ function renderTagOptions() {
 				} catch (e) {
 					await refresh();
 				}
+				pendingTagActions.delete(tag.id);
 				renderTagOptions();
 			},
 		);
 		tagOptions.appendChild(row);
 	}
+	renderTagPendingSummary();
 }
 
 tagNewBtn.addEventListener("click", async () => {
@@ -1343,6 +1370,57 @@ tagNewInput.addEventListener("keydown", (e) => {
 	if (e.key === "Enter") tagNewBtn.click();
 });
 tagClose.addEventListener("click", closeTagModal);
+tagApplyBtn.addEventListener("click", async () => {
+	const entries = getPendingTagActionEntries();
+	if (!entries.length) return;
+	const liveTargets = resolveTagTargets();
+	const hashes = [...new Set(liveTargets.map((v) => v.hash).filter(Boolean))];
+	if (!hashes.length) {
+		toast("No taggable videos selected", "error");
+		return;
+	}
+
+	const addingNames = entries
+		.filter(([, action]) => action === "add")
+		.map(([tagID]) => TAG_MAP[tagID]?.name || tagID);
+	const removingNames = entries
+		.filter(([, action]) => action === "remove")
+		.map(([tagID]) => TAG_MAP[tagID]?.name || tagID);
+	const confirmLines = [
+		"Apply tag changes to " + hashes.length + " videos?",
+	];
+	if (addingNames.length) confirmLines.push("Add: " + addingNames.join(", "));
+	if (removingNames.length)
+		confirmLines.push("Remove: " + removingNames.join(", "));
+	if (!confirm(confirmLines.join("\n"))) return;
+
+	let failures = 0;
+	for (const [tagID, action] of entries) {
+		const ok = await setTagAssignmentsBulk(hashes, tagID, action === "add");
+		if (!ok) failures++;
+	}
+	if (failures) {
+		toast(failures + " tag update(s) failed", "error");
+		await refresh();
+		renderTagOptions();
+		return;
+	}
+
+	try {
+		await refreshTagsOnly();
+		await refreshTagAssignmentsForHashes(hashes);
+		refreshDerivedUI(false);
+	} catch (e) {
+		await refresh();
+	}
+	pendingTagActions = new Map();
+	renderTagOptions();
+	toast("Tag changes applied", "success");
+	if (selectMode) {
+		closeTagModal();
+		exitSelectMode();
+	}
+});
 tagCancelBtn.addEventListener("click", closeTagModal);
 tagModal.addEventListener("click", (e) => {
 	if (e.target === tagModal) closeTagModal();
@@ -2243,6 +2321,25 @@ async function setTagAssignment(hash, tagID, assigned) {
 	}
 }
 
+async function setTagAssignmentsBulk(hashes, tagID, assigned) {
+	try {
+		const uniqueHashes = [...new Set((hashes || []).filter(Boolean))];
+		if (!uniqueHashes.length) return true;
+		const res = await fetch("/api/tags/assign/bulk", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				hashes: uniqueHashes,
+				tag_id: tagID,
+				assigned,
+			}),
+		});
+		return res.ok;
+	} catch (e) {
+		return false;
+	}
+}
+
 async function createCollection(name) {
 	try {
 		const res = await fetch("/api/collections/create", {
@@ -2460,11 +2557,9 @@ incomingConfirmBtn.addEventListener("click", async () => {
 	const incomingHashes = [...new Set(incoming.map((v) => v.hash).filter(Boolean))];
 	let tagErrs = 0;
 	if (incomingSelectedTagIDs.size && incomingHashes.length) {
-		for (const hash of incomingHashes) {
-			for (const tagID of incomingSelectedTagIDs) {
-				const ok = await setTagAssignment(hash, tagID, true);
-				if (!ok) tagErrs++;
-			}
+		for (const tagID of incomingSelectedTagIDs) {
+			const ok = await setTagAssignmentsBulk(incomingHashes, tagID, true);
+			if (!ok) tagErrs++;
 		}
 	}
 	const ok = await clearNewStatus(reviewedPaths, false);

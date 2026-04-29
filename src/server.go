@@ -70,6 +70,7 @@ func newServer(root string) (*server, error) {
 	s.mux.HandleFunc("GET /api/tags", s.handleTags)
 	s.mux.HandleFunc("POST /api/tags/create", s.handleCreateTag)
 	s.mux.HandleFunc("POST /api/tags/assign", s.handleAssignTag)
+	s.mux.HandleFunc("POST /api/tags/assign/bulk", s.handleAssignTagBulk)
 	s.mux.HandleFunc("POST /api/tags/delete", s.handleDeleteTag)
 	s.mux.HandleFunc("POST /api/tags/videos", s.handleTagVideoAssignments)
 	s.mux.HandleFunc("GET /api/collections", s.handleCollections)
@@ -370,6 +371,26 @@ func (s *server) handleAssignTag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	serverLog.Debug("tag assignment updated", "hash", req.Hash, "tag_id", req.TagID, "assigned", req.Assigned)
+	w.WriteHeader(http.StatusOK)
+}
+
+func (s *server) handleAssignTagBulk(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Hashes   []string `json:"hashes"`
+		TagID    string   `json:"tag_id"`
+		Assigned bool     `json:"assigned"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		serverLog.Error("failed parsing bulk assign tag payload", "error", err)
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	if err := s.tags.SetAssignmentBulk(req.Hashes, req.TagID, req.Assigned); err != nil {
+		serverLog.Error("failed bulk assigning tag", "hash_count", len(req.Hashes), "tag_id", req.TagID, "assigned", req.Assigned, "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	serverLog.Debug("tag bulk assignment updated", "hash_count", len(req.Hashes), "tag_id", req.TagID, "assigned", req.Assigned)
 	w.WriteHeader(http.StatusOK)
 }
 

@@ -32,13 +32,13 @@ keeps track of when something was uploaded, if something was uploaded before the
 - [x] add the tags we create next to the visaul "mp4" and "new" tags
 - [x] the opition to rename files
 
-- [ ] Collection tweaks:
-  - [ ] master controls on collections: (mass play button, mass volume control)
-  - [ ] change grid width for collections: (4,3,2,1)
-  - [ ] make a folder a collection: button when clicked give you the option to make a collection 
+- [x] Collection tweaks:
+  - [x] master controls on collections: (mass play button, mass volume control)
+  - [x] change grid width for collections: (4,3,2,1)
+  - [x] make a folder a collection: button when clicked give you the option to make a collection 
 
-- [ ] Tag tweaks:
-  - [ ] for tags: instead of checkboxes, do a mass add remove and an endpoint to do it in bulk, similar to how wo do in the mass sort
+- [x] Tag tweaks:
+  - [x] for tags: instead of checkboxes, do a mass add/remove and an endpoint to do it in bulk, similar to how we do in the mass sort
 
 - [ ] status bar for loading
 - [ ] thumbnail caching? cahce directory 

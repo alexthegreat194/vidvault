@@ -254,6 +254,63 @@ func (s *TagsStore) SetAssignment(hash, tagID string, assigned bool) error {
 	return s.persistLocked()
 }
 
+func (s *TagsStore) SetAssignmentBulk(hashes []string, tagID string, assigned bool) error {
+	tagID = strings.TrimSpace(tagID)
+	if tagID == "" {
+		return errors.New("missing tag id")
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	tagsLog.Debug("setting bulk tag assignment", "hash_count", len(hashes), "tag_id", tagID, "assigned", assigned)
+
+	if !s.hasTagLocked(tagID) {
+		return errors.New("tag not found")
+	}
+
+	changed := false
+	seen := make(map[string]struct{}, len(hashes))
+	for _, hash := range hashes {
+		hash = strings.TrimSpace(hash)
+		if hash == "" {
+			continue
+		}
+		if _, ok := seen[hash]; ok {
+			continue
+		}
+		seen[hash] = struct{}{}
+
+		current := s.assignments[hash]
+		has := slices.Contains(current, tagID)
+
+		if assigned && !has {
+			s.assignments[hash] = append(current, tagID)
+			changed = true
+			continue
+		}
+
+		if !assigned && has {
+			next := make([]string, 0, len(current)-1)
+			for _, id := range current {
+				if id != tagID {
+					next = append(next, id)
+				}
+			}
+			if len(next) == 0 {
+				delete(s.assignments, hash)
+			} else {
+				s.assignments[hash] = next
+			}
+			changed = true
+		}
+	}
+
+	if !changed {
+		return nil
+	}
+	return s.persistLocked()
+}
+
 func (s *TagsStore) hasTagLocked(tagID string) bool {
 	for _, t := range s.tags {
 		if t.ID == tagID {
