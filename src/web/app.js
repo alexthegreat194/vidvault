@@ -148,7 +148,12 @@ const gallery = document.getElementById("gallery"),
 	),
 	previewSettingsVolumeInput = document.getElementById(
 		"preview-settings-volume",
-	);
+	),
+	pinGateOverlay = document.getElementById("pin-gate-overlay"),
+	pinGateForm = document.getElementById("pin-gate-form"),
+	pinGateInput = document.getElementById("pin-gate-input"),
+	pinGateError = document.getElementById("pin-gate-error"),
+	pinLockBtn = document.getElementById("pin-lock-btn");
 
 let ALL_VIDEOS = [],
 	DISCOVERED_VIDEOS = [],
@@ -171,6 +176,8 @@ let DUPLICATE_GROUPS = [],
 	autoOpenedDuplicates = false;
 let incomingBannerDismissed = false;
 let showFavoritesOnly = false;
+let pinGateMode = false;
+let pinGateUnlocked = false;
 let isVideoDiscoveryLoading = false;
 let tagTargetPaths = [];
 let pendingTagActions = new Map();
@@ -507,6 +514,97 @@ function renderVideoTagChips(tagIDs) {
 	const chips = renderVideoTagChipsInner(tagIDs);
 	if (!chips) return "";
 	return '<div class="card-tags">' + chips + "</div>";
+}
+
+function setPinOverlayVisible(show, message) {
+	if (!pinGateOverlay) return;
+	pinGateOverlay.hidden = !show;
+	pinGateOverlay.setAttribute("aria-hidden", show ? "false" : "true");
+	document.body.classList.toggle("pin-gate-open", Boolean(show));
+	if (pinGateInput) pinGateInput.disabled = !show;
+	if (pinGateError) {
+		if (message) {
+			pinGateError.hidden = false;
+			pinGateError.textContent = message;
+		} else {
+			pinGateError.hidden = true;
+			pinGateError.textContent = "";
+		}
+	}
+	if (show && pinGateInput) {
+		queueMicrotask(() => pinGateInput.focus());
+	}
+}
+
+function updatePinLockButton() {
+	if (!pinLockBtn) return;
+	pinLockBtn.hidden = !(pinGateMode && pinGateUnlocked);
+}
+
+function isAuthPinFetchArg(input) {
+	const raw = typeof input === "string" ? input : input && input.url;
+	if (!raw) return false;
+	try {
+		return new URL(raw, location.href).pathname === "/api/auth/pin";
+	} catch {
+		return false;
+	}
+}
+
+function installFetch401Handler() {
+	if (window.__vidvaultFetchPatched) return;
+	window.__vidvaultFetchPatched = true;
+	const orig = window.fetch.bind(window);
+	window.fetch = function (input, init) {
+		const merged = init ? { ...init } : {};
+		if (!merged.credentials) merged.credentials = "same-origin";
+		return orig(input, merged).then((res) => {
+			if (
+				res.status === 401 &&
+				pinGateMode &&
+				!isAuthPinFetchArg(input)
+			) {
+				pinGateUnlocked = false;
+				updatePinLockButton();
+				unloadLibraryAfterPinLock();
+				setPinOverlayVisible(
+					true,
+					"Session locked or PIN required.",
+				);
+			}
+			return res;
+		});
+	};
+}
+
+async function bootstrap() {
+	let st;
+	try {
+		const res = await fetch("/api/auth/status");
+		st = await res.json();
+	} catch (e) {
+		console.error(e);
+		return;
+	}
+	if (!st.pinRequired) {
+		pinGateMode = false;
+		pinGateUnlocked = false;
+		updatePinLockButton();
+		await init();
+		return;
+	}
+	pinGateMode = true;
+	installFetch401Handler();
+	if (st.authenticated) {
+		pinGateUnlocked = true;
+		setPinOverlayVisible(false);
+		updatePinLockButton();
+		await init();
+		return;
+	}
+	pinGateUnlocked = false;
+	updatePinLockButton();
+	setPinOverlayVisible(true);
 }
 
 async function init() {
@@ -2278,6 +2376,19 @@ function exitSelectMode() {
 		.forEach((c) => c.classList.remove("selected"));
 	selectBar.classList.remove("visible");
 }
+
+/** Clears in-memory video lists after lock so paths/metadata are dropped until unlock. */
+function unloadLibraryAfterPinLock() {
+	closeModal();
+	currentIdx = -1;
+	DOWNLOADED_VIDEOS = [];
+	DISCOVERED_VIDEOS = [];
+	rebuildAllVideos();
+	isVideoDiscoveryLoading = false;
+	exitSelectMode();
+	refreshDerivedUI(false);
+}
+
 selectBtn.addEventListener("click", () => {
 	if (selectMode) {
 		exitSelectMode();
@@ -2942,4 +3053,55 @@ if (previewSettingsVolumeInput) {
 	});
 }
 
-init();
+if (pinGateForm) {
+	pinGateForm.addEventListener("submit", async (e) => {
+		e.preventDefault();
+		const pin = (pinGateInput && pinGateInput.value) || "";
+		if (pinGateError) {
+			pinGateError.hidden = true;
+			pinGateError.textContent = "";
+		}
+		try {
+			const res = await fetch("/api/auth/pin", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ pin }),
+			});
+			let j = {};
+			try {
+				j = await res.json();
+			} catch {
+				/* ignore */
+			}
+			if (!res.ok || !j.ok) {
+				setPinOverlayVisible(true, "Incorrect PIN.");
+				if (pinGateInput) pinGateInput.select();
+				return;
+			}
+			pinGateUnlocked = true;
+			setPinOverlayVisible(false);
+			updatePinLockButton();
+			await init();
+		} catch (err) {
+			console.error(err);
+			setPinOverlayVisible(true, "Could not reach server.");
+		}
+	});
+}
+if (pinLockBtn) {
+	pinLockBtn.addEventListener("click", async () => {
+		try {
+			const res = await fetch("/api/auth/lock", { method: "POST" });
+			if (!res.ok) return;
+			unloadLibraryAfterPinLock();
+			pinGateUnlocked = false;
+			updatePinLockButton();
+			if (pinGateInput) pinGateInput.value = "";
+			setPinOverlayVisible(true);
+		} catch (e) {
+			console.error(e);
+		}
+	});
+}
+
+bootstrap();

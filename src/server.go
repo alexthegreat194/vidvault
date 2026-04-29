@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -27,13 +28,17 @@ type server struct {
 	seenFiles   *SeenFilesStore
 	videoCache  *videoScanCache
 	mux         *http.ServeMux
+	pin         string
+	authSecret  []byte
+	authGen     uint64
+	authMu      sync.RWMutex
 }
 
 var serverLog = fileLogger("server")
 
 // newServer constructs a server rooted at root and registers all API and
 // static routes on a fresh ServeMux.
-func newServer(root string) (*server, error) {
+func newServer(root, pin string) (*server, error) {
 	serverLog.Debug("initializing server", "root", root)
 	favorites, err := newFavoritesStore()
 	if err != nil {
@@ -61,6 +66,12 @@ func newServer(root string) (*server, error) {
 		videoCache:  newVideoScanCache(),
 		mux:         http.NewServeMux(),
 	}
+	if err := initPinAuth(s, pin); err != nil {
+		return nil, err
+	}
+	s.mux.HandleFunc("GET /api/auth/status", s.handleAuthStatus)
+	s.mux.HandleFunc("POST /api/auth/pin", s.handleAuthPin)
+	s.mux.HandleFunc("POST /api/auth/lock", s.handleAuthLock)
 	s.mux.HandleFunc("GET /favicon.svg", s.handleFavicon)
 	s.mux.HandleFunc("/", s.handleIndex)
 	s.mux.HandleFunc("/api/videos", s.handleVideos)
@@ -98,6 +109,19 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	rw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
 	serverLog.Debug("request started", "method", r.Method, "path", r.URL.Path, "query", r.URL.RawQuery, "remote", r.RemoteAddr)
+	if s.applyPinGate(rw, r) {
+		fields := []any{
+			"method", r.Method,
+			"path", r.URL.Path,
+			"status", rw.status,
+			"duration_ms", time.Since(start).Milliseconds(),
+		}
+		if debugMode.Load() {
+			fields = append(fields, "bytes", rw.bytes, "remote", r.RemoteAddr, "user_agent", r.UserAgent())
+		}
+		serverLog.Info("request completed", fields...)
+		return
+	}
 	s.mux.ServeHTTP(rw, r)
 	fields := []any{
 		"method", r.Method,

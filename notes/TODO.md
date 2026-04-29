@@ -42,7 +42,7 @@ keeps track of when something was uploaded, if something was uploaded before the
 
 - [x] status bar for loading
 - [ ] thumbnail caching? cahce directory 
-- [ ] live preview
+- [x] live preview
 - [ ] more info on files that dont match types
 - [ ] select button is hidden
 - [ ] Password able to be set in the ui (pin/password)

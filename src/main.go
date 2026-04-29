@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 var mainLog = fileLogger("main")
@@ -19,6 +20,7 @@ func main() {
 	port := flag.Int("p", 8765, "port to listen on")
 	debug := flag.Bool("d", false, "debug mode")
 	disableBrowser := flag.Bool("disable-browser", false, "disable browser opening")
+	pin := flag.String("pin", "", "optional PIN; when set, web UI and APIs require unlock until entered")
 	flag.Parse()
 
 	configureLogging(*debug)
@@ -64,7 +66,7 @@ func main() {
 		mainLog.Debug("browser auto-open disabled")
 	}
 
-	srv, err := newServer(root)
+	srv, err := newServer(root, strings.TrimSpace(*pin))
 	if err != nil {
 		mainLog.Error("cannot initialize server", "error", err)
 		os.Exit(1)
