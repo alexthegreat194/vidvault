@@ -5,7 +5,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-IMAGE="${IMAGE:-vidvault:local}"
+IMAGE="${IMAGE:-alexthegreat1941/vidvault:latest}"
 PLATFORM="${PLATFORM:-}"
 
 echo "Building $IMAGE …"

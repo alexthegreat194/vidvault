@@ -152,8 +152,8 @@ const gallery = document.getElementById("gallery"),
 	pinGateOverlay = document.getElementById("pin-gate-overlay"),
 	pinGateForm = document.getElementById("pin-gate-form"),
 	pinGateInput = document.getElementById("pin-gate-input"),
-	pinGateError = document.getElementById("pin-gate-error"),
-	pinLockBtn = document.getElementById("pin-lock-btn");
+	pinGateError = document.getElementById("pin-gate-error");
+let pinLockBtn = document.getElementById("pin-lock-btn");
 
 let ALL_VIDEOS = [],
 	DISCOVERED_VIDEOS = [],
@@ -589,7 +589,10 @@ async function bootstrap() {
 	if (!st.pinRequired) {
 		pinGateMode = false;
 		pinGateUnlocked = false;
-		updatePinLockButton();
+		if (pinLockBtn) {
+			pinLockBtn.remove();
+			pinLockBtn = null;
+		}
 		await init();
 		return;
 	}
