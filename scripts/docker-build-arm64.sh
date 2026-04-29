@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# Build a zimoOS-ready Docker image (linux/amd64 by default).
+# Build a arm64-ready Docker image (linux/arm64 by default).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-IMAGE="${IMAGE:-vidvault:zimoos}"
-PLATFORM="${PLATFORM:-linux/amd64}"
+IMAGE="${IMAGE:-vidvault:arm64}"
+PLATFORM="${PLATFORM:-linux/arm64}"
 PUSH="${PUSH:-0}"
 LOAD="${LOAD:-1}"
 PROVENANCE="${PROVENANCE:-false}"
 
-echo "Building image for zimoOS..."
+echo "Building image for arm64..."
 echo "  image:    $IMAGE"
 echo "  platform: $PLATFORM"
 

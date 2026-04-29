@@ -1,6 +1,6 @@
 // vidvault — local video gallery server
 // Build:  go build -o vidvault ./src
-// Run:    ./vidvault [directory] [--port 8765]
+// Run:    ./vidvault [directory] [-p 8765]
 package main
 
 import (

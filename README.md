@@ -26,19 +26,49 @@ go build -o vidvault ./src
 - Prints local and LAN URLs and opens the app in your default browser
 - Listens on **all interfaces** (`0.0.0.0`) so other devices on your LAN can use the “network” URL
 
-Serve a specific folder and port:
+Serve a specific folder and port (**flags first**, then the directory — Go’s `flag` package stops parsing at the first non-flag argument):
 
 ```bash
-./vidvault /path/to/media --port 9000
-# or
-./vidvault ~/Videos -p 9000
+./vidvault -p 9000 /path/to/media
+./vidvault -p 9000 ~/Videos
+```
+
+### Command-line flags
+
+Arguments are parsed with Go’s standard `flag` package (use `-flag` / `-flag=value`). Put **all flags before** the optional media directory.
+
+| Flag | Default | Description |
+| ---- | ------- | ----------- |
+| *(positional)* | `.` | Media root directory (optional path **after** all `-…` flags). |
+| `-p` | `8765` | TCP port to listen on (`0.0.0.0`). |
+| `-d` | off | Enable debug logging. |
+| `-disable-browser` | off | Do not open the default browser when the server starts. |
+| `-pin` | *(empty)* | Optional PIN: when set, the web UI and APIs stay locked until the PIN is entered. |
+
+Examples:
+
+```bash
+./vidvault -p 9000 ~/Videos
+./vidvault -d -disable-browser /srv/media
+./vidvault -pin 1234 /path/to/media
 ```
 
 ## Run with Docker
 
-The repo includes a multi-stage [`Dockerfile`](Dockerfile) and a helper script.
+The repo includes a multi-stage [`Dockerfile`](Dockerfile) and helper scripts.
 
-**Build and run (defaults: image `vidvault:local`, host port `8765`, host data directory `./data` → `/data` in the container):**
+**Build only** (defaults: image `vidvault:local`; set `PLATFORM` for `docker build --platform`, e.g. `linux/arm64`):
+
+```bash
+./scripts/docker-build.sh
+```
+
+| Variable   | Default          | Role |
+| ---------- | ---------------- | ---- |
+| `IMAGE`    | `vidvault:local` | Image tag passed to `docker build -t`. |
+| `PLATFORM` | *(empty)*        | If set, passed as `docker build --platform`. |
+
+**Build and run** (defaults: image `vidvault:local`, host port `8765`, host data directory `./data` → `/data` in the container):
 
 ```bash
 ./scripts/docker-run.sh
@@ -48,18 +78,32 @@ Override with environment variables:
 
 | Variable  | Default        | Role                                      |
 | --------- | -------------- | ----------------------------------------- |
-| `IMAGE`   | `vidvault:local` | Docker image name                       |
+| `IMAGE`   | `vidvault:local` | Docker image name (passed through to `docker-build.sh`) |
+| `PLATFORM`| *(empty)*      | If set, `docker build --platform` during the build step |
 | `PORT`    | `8765`         | Host port mapped to the container’s `8765` |
 | `DATA_DIR`| repo `./data`  | Host directory mounted as media root `/data` |
+
+The image [`docker-entrypoint.sh`](docker-entrypoint.sh) runs before the binary and turns optional **container** environment variables into the same flags as above (truthy values: `1`, `true`, `yes`, `on`, case-insensitive):
+
+| Variable | Maps to |
+| -------- | ------- |
+| `VIDVAULT_DEBUG` | `-d` |
+| `VIDVAULT_DISABLE_BROWSER` | `-disable-browser` |
+| `VIDVAULT_PIN` | `-pin` (value from the variable) |
+
+Those are merged **before** the image `CMD` / your `docker run … image …` arguments, so defaults still work, e.g. `CMD` is `-p 8765 /data`.
 
 **Manual example:**
 
 ```bash
 docker build -t vidvault:local .
 docker run --rm -p 8765:8765 -v /path/to/your/videos:/data vidvault:local -p 8765 /data
+docker run --rm -p 8765:8765 -v /path/to/your/videos:/data \
+  -e VIDVAULT_DISABLE_BROWSER=1 \
+  vidvault:local -p 8765 /data
 ```
 
-The process inside the container uses port `8765`; map your host port with `-p HOST:8765` if you use something other than `docker-run.sh`.
+The process inside the container listens on port `8765`; map your host port with `-p HOST:8765` if you use something other than `docker-run.sh`.
 
 ## Features
 
@@ -128,10 +172,12 @@ follow file moves/renames.
 | Path | Role |
 | ---- | ---- |
 | [`go.mod`](go.mod) | Go module (`vidvault`). |
-| [`Dockerfile`](Dockerfile) | Multi-stage image: build Go binary, Alpine runtime, default `CMD` serves `/data` on `8765`. |
-| [`scripts/docker-run.sh`](scripts/docker-run.sh) | Build image and `docker run` with volume and port mapping. |
+| [`Dockerfile`](Dockerfile) | Multi-stage image: Alpine runtime, [`docker-entrypoint.sh`](docker-entrypoint.sh) maps `VIDVAULT_*` env → flags, then `CMD` runs `/vidvault -p 8765 /data`. |
+| [`scripts/docker-build.sh`](scripts/docker-build.sh) | `docker build` for a generic local image (`IMAGE`, optional `PLATFORM`). |
+| [`scripts/docker-run.sh`](scripts/docker-run.sh) | Calls `docker-build.sh`, then `docker run` with volume and port mapping. |
+| [`scripts/docker-build-arm64.sh`](scripts/docker-build-arm64.sh) | `docker buildx` for `linux/arm64` (optional push/load). |
 | [`package.json`](package.json) | `npm run format` — Prettier on `src/web/**/*.js`. |
-| `src/main.go` | CLI flags, resolve media root, print URLs, open browser, start server. |
+| `src/main.go` | CLI (`-p`, `-d`, `-disable-browser`, `-pin`), resolve media root, print URLs, optional browser, start server. |
 | `src/server.go` | Routes, API handlers, video streaming. |
 | `src/video.go` | Supported extensions, `Video` struct, directory walk. |
 | `src/template.go` | `embed` of `src/web/*` and single HTML document assembly. |
@@ -146,7 +192,7 @@ Rebuilding the binary (`go build -o vidvault ./src`) is required after changing 
 
 ```bash
 go build -o vidvault ./src
-./vidvault ./some-test-media -p 8765
+./vidvault -p 8765 ./some-test-media
 ```
 
 Format JavaScript with Prettier:

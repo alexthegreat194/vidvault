@@ -45,10 +45,11 @@ keeps track of when something was uploaded, if something was uploaded before the
 - [x] live preview
 - [ ] more info on files that dont match types
 - [ ] select button is hidden
-- [ ] Password able to be set in the ui (pin/password)
+- [x] Password able to be set in the ui (pin/password)
 - [ ] after mass upload, then re render
 - [ ] dont open duplucate manager after refresh
 - [ ] when dragging, make little icon
+- [ ] lock button is visible even when pin is not visible
 
 Analytics:
 - [ ] Most watched videos: videos that were watched the most amount of times, ability to sort by most watched
