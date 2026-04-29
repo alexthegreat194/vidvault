@@ -27,10 +27,17 @@ keeps track of when something was uploaded, if something was uploaded before the
 - [x] auto detect duplicates with embeddings?
 - [ ] videos that were watched the most amount of times, ability to sort by most watched
 - [ ] master controls on collections
+  - mass play
+  - mass volume control
 - [ ] change grid width for collections
 - [ ] status bar for loading
 - [ ] thumbnail caching? cahce directory 
 - [ ] live preview
 - [ ] more info on files that dont match types
 - [ ] select button is hidden
-- [ ] Password able to be set in the ui
+- [ ] Password able to be set in the ui (pin/password)
+- [ ] for tags: instead of checkboxes, do a mass add remove and an endpoint to do it in bulk
+- [ ] after mass upload, then re render
+- [ ] dont open duplucate manager after refresh
+- [ ]  make a folder a collection
+- [ ] when dragging, make little icon

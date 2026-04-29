@@ -44,8 +44,27 @@
   </div>
 </div>
 
+<div class="incoming-banner" id="incoming-banner">
+  <span class="incoming-banner-text" id="incoming-banner-text"></span>
+  <div class="incoming-banner-actions">
+    <button class="btn" id="incoming-review-btn">View</button>
+    <button class="btn active" id="incoming-mass-sort-btn">Mass sort</button>
+    <button class="btn" id="incoming-dismiss-btn">Dismiss</button>
+  </div>
+</div>
+
 <div class="shell">
   <aside>
+    <div class="sidebar-section">
+      <div class="sidebar-header">
+        <span class="sidebar-label">Incoming</span>
+      </div>
+      <div id="incoming-list"></div>
+      <div class="sidebar-inline-actions">
+        <button class="btn" id="incoming-mark-all-btn">Mark all reviewed</button>
+      </div>
+    </div>
+
     <div class="sidebar-section">
       <div class="sidebar-header" id="tags-header">
         <span class="sidebar-label">Tags</span>
@@ -109,6 +128,10 @@
   <div class="ctx-item danger" id="ctx-delete">
     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
     Delete file…
+  </div>
+  <div class="ctx-item" id="ctx-forget">
+    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18"/><path d="M12 3v18"/></svg>
+    Forget (mark as new)…
   </div>
 </div>
 
@@ -201,6 +224,33 @@
   </div>
 </div>
 
+<div id="incoming-modal">
+  <div class="move-inner">
+    <div class="move-header">
+      <div>
+        <div class="move-title">Mass sort incoming media</div>
+        <div class="move-subtitle" id="incoming-subtitle"></div>
+      </div>
+      <button class="close-btn" id="incoming-close">✕</button>
+    </div>
+    <div class="move-body">
+      <div>
+        <div class="sidebar-label" style="padding-bottom:6px">Add tags to all incoming</div>
+        <div id="incoming-tag-options"></div>
+      </div>
+      <div>
+        <div class="sidebar-label" style="padding-bottom:6px">Move all incoming to folder</div>
+        <div id="incoming-folder-options"></div>
+      </div>
+    </div>
+    <div class="move-footer">
+      <button class="btn" id="incoming-cancel-btn">Close</button>
+      <button class="btn active" id="incoming-confirm-btn">Apply mass sort</button>
+      <button class="btn" id="incoming-mark-reviewed-btn">Mark all reviewed</button>
+    </div>
+  </div>
+</div>
+
 <div id="modal">
   <div class="modal-inner">
     <div class="modal-header">
@@ -221,6 +271,7 @@
   <button class="btn" id="select-tag-btn">Tags…</button>
   <button class="btn" id="select-collection-btn">Add to collection…</button>
   <button class="btn active" id="select-move-btn">Move…</button>
+  <button class="btn" id="select-forget-btn">Forget…</button>
   <button class="btn" id="select-all-btn">All</button>
   <button class="btn" id="select-clear-btn">Clear</button>
 </div>

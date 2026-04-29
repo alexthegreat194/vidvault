@@ -1,5 +1,6 @@
 const gallery = document.getElementById("gallery"),
 	folderList = document.getElementById("folder-list"),
+	incomingList = document.getElementById("incoming-list"),
 	tagList = document.getElementById("tag-list"),
 	searchEl = document.getElementById("search"),
 	statsEl = document.getElementById("stats"),
@@ -19,6 +20,7 @@ const gallery = document.getElementById("gallery"),
 	selectCount = document.getElementById("select-count"),
 	selectTagBtn = document.getElementById("select-tag-btn"),
 	selectMoveBtn = document.getElementById("select-move-btn"),
+	selectForgetBtn = document.getElementById("select-forget-btn"),
 	selectAllBtn = document.getElementById("select-all-btn"),
 	selectClearBtn = document.getElementById("select-clear-btn"),
 	newFolderBtn = document.getElementById("new-folder-btn"),
@@ -61,6 +63,20 @@ const gallery = document.getElementById("gallery"),
 	dupClose = document.getElementById("dup-close"),
 	dupCancelBtn = document.getElementById("dup-cancel-btn"),
 	dupResolveAllBtn = document.getElementById("dup-resolve-all-btn"),
+	incomingBanner = document.getElementById("incoming-banner"),
+	incomingBannerText = document.getElementById("incoming-banner-text"),
+	incomingReviewBtn = document.getElementById("incoming-review-btn"),
+	incomingMassSortBtn = document.getElementById("incoming-mass-sort-btn"),
+	incomingDismissBtn = document.getElementById("incoming-dismiss-btn"),
+	incomingMarkAllBtn = document.getElementById("incoming-mark-all-btn"),
+	incomingModal = document.getElementById("incoming-modal"),
+	incomingSubtitle = document.getElementById("incoming-subtitle"),
+	incomingTagOptions = document.getElementById("incoming-tag-options"),
+	incomingFolderOptions = document.getElementById("incoming-folder-options"),
+	incomingClose = document.getElementById("incoming-close"),
+	incomingCancelBtn = document.getElementById("incoming-cancel-btn"),
+	incomingConfirmBtn = document.getElementById("incoming-confirm-btn"),
+	incomingMarkReviewedBtn = document.getElementById("incoming-mark-reviewed-btn"),
 	tagModal = document.getElementById("tag-modal"),
 	tagSubtitle = document.getElementById("tag-subtitle"),
 	tagOptions = document.getElementById("tag-options"),
@@ -122,11 +138,15 @@ let selectMode = false,
 let DUPLICATE_GROUPS = [],
 	duplicateBannerDismissed = false,
 	autoOpenedDuplicates = false;
+let incomingBannerDismissed = false;
 let showFavoritesOnly = false;
 let isVideoDiscoveryLoading = false;
 let tagTargetPaths = [];
 let activeCollectionID = "";
 let collectionPickerTargetHashes = [];
+let activeIncomingFilter = false;
+let incomingSelectedFolder = "/";
+let incomingSelectedTagIDs = new Set();
 const DEFAULT_LOOP_ALL_VIDEOS = true;
 
 function applyDefaultVideoFlags(videoEl) {
@@ -200,12 +220,40 @@ function upsertDownloadedVideo(video) {
 
 function refreshDerivedUI(mayAutoOpenDuplicates) {
 	computeDuplicateGroups();
+	buildIncomingNav();
 	buildTagNav();
 	buildFolderNav();
 	buildCollectionNav();
 	render();
 	updateDuplicateBanner(Boolean(mayAutoOpenDuplicates));
+	updateIncomingBanner();
 	populateUploadFolders();
+}
+
+function countIncomingVideos() {
+	return ALL_VIDEOS.filter((v) => Boolean(v.is_new)).length;
+}
+
+function buildIncomingNav() {
+	incomingList.innerHTML = "";
+	const incomingCount = countIncomingVideos();
+	incomingMarkAllBtn.style.display = incomingCount > 0 ? "" : "none";
+	const btn = document.createElement("button");
+	btn.className = "tag-btn" + (activeIncomingFilter ? " active" : "");
+	btn.innerHTML =
+		'<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20"/><path d="M2 12h20"/></svg>' +
+		"<span>Need sorting</span>" +
+		'<span class="count">' +
+		incomingCount +
+		"</span>";
+	btn.addEventListener("click", () => {
+		activeIncomingFilter = !activeIncomingFilter;
+		if (activeIncomingFilter) activeFolder = "__all__";
+		buildIncomingNav();
+		buildFolderNav();
+		render();
+	});
+	incomingList.appendChild(btn);
 }
 
 function tagCountByID(tagID) {
@@ -403,6 +451,24 @@ function updateDuplicateBanner(mayAutoOpen) {
 		openDuplicateModal();
 		autoOpenedDuplicates = true;
 	}
+}
+
+function updateIncomingBanner() {
+	const incomingCount = countIncomingVideos();
+	if (!incomingCount) {
+		incomingBanner.classList.remove("visible");
+		incomingBannerDismissed = false;
+		if (incomingModal.classList.contains("open")) closeIncomingModal();
+		return;
+	}
+	incomingBannerText.textContent =
+		incomingCount +
+		" new file" +
+		(incomingCount === 1 ? "" : "s") +
+		" need sorting.";
+	const shouldShow =
+		!incomingBannerDismissed || incomingModal.classList.contains("open");
+	incomingBanner.classList.toggle("visible", shouldShow);
 }
 
 function openDuplicateModal() {
@@ -708,7 +774,8 @@ function render() {
 			!q ||
 			v.name.toLowerCase().includes(q) ||
 			(v.folder || "").toLowerCase().includes(q);
-		return inF && inFav && inT && inS;
+		const inIncoming = !activeIncomingFilter || Boolean(v.is_new);
+		return inF && inFav && inT && inS && inIncoming;
 	});
 	filtered.sort((a, b) => {
 		if (sort === "name") return a.name.localeCompare(b.name);
@@ -790,9 +857,11 @@ function render() {
 			'<span class="card-path">' +
 			escHtml(v.folder || "/") +
 			"</span>" +
-			'<span class="card-ext">' +
+			'<div class="card-badges"><span class="card-ext">' +
 			escHtml(v.ext.slice(1)) +
 			"</span>" +
+			(v.is_new ? '<span class="card-ext">new</span>' : "") +
+			"</div>" +
 			'<span class="card-path">' +
 			escHtml(formatBytes(v.size || 0)) +
 			" • " +
@@ -859,6 +928,29 @@ function render() {
 		);
 		gallery.appendChild(card);
 	});
+	if (activeIncomingFilter && filtered.length) {
+		const actions = document.createElement("div");
+		actions.style.gridColumn = "1 / -1";
+		actions.style.display = "flex";
+		actions.style.justifyContent = "center";
+		actions.style.paddingTop = "8px";
+		const btn = document.createElement("button");
+		btn.className = "btn";
+		btn.textContent = "Mark all reviewed";
+		btn.addEventListener("click", async () => {
+			const paths = filtered.map((v) => v.path).filter(Boolean);
+			if (!paths.length) return;
+			const ok = await clearNewStatus(paths, false);
+			if (!ok) {
+				toast("Failed to mark filtered videos as reviewed", "error");
+				return;
+			}
+			await refresh();
+			toast("Marked filtered videos as reviewed", "success");
+		});
+		actions.appendChild(btn);
+		gallery.appendChild(actions);
+	}
 }
 
 /**
@@ -947,7 +1039,8 @@ document.addEventListener("keydown", (e) => {
 const ctxMenu = document.getElementById("ctx-menu"),
 	ctxTagsEl = document.getElementById("ctx-tags"),
 	ctxMoveEl = document.getElementById("ctx-move"),
-	ctxDeleteEl = document.getElementById("ctx-delete");
+	ctxDeleteEl = document.getElementById("ctx-delete"),
+	ctxForgetEl = document.getElementById("ctx-forget");
 let ctxVideo = null;
 /**
  * Positions and shows the card context menu at the pointer location.
@@ -966,6 +1059,16 @@ ctxTagsEl.addEventListener("click", () => {
 });
 ctxMoveEl.addEventListener("click", () => {
 	if (ctxVideo) openMoveModal(ctxVideo);
+});
+ctxForgetEl.addEventListener("click", async () => {
+	if (!ctxVideo) return;
+	const ok = await forgetVideos([ctxVideo.path], [], false);
+	if (!ok) {
+		toast("Failed to forget file", "error");
+		return;
+	}
+	toast("File forgotten and re-queued", "success");
+	await refresh();
 });
 ctxDeleteEl.addEventListener("click", async () => {
 	if (!ctxVideo) return;
@@ -1247,6 +1350,86 @@ async function moveVideo(srcPath, destFolder) {
 	} else {
 		toast("Move failed: " + (await res.text()), "error");
 	}
+}
+
+function openIncomingModal() {
+	const incoming = ALL_VIDEOS.filter((v) => Boolean(v.is_new));
+	incomingSubtitle.textContent =
+		incoming.length +
+		" incoming file" +
+		(incoming.length === 1 ? "" : "s");
+	incomingSelectedFolder = "/";
+	incomingSelectedTagIDs = new Set();
+	renderIncomingTagOptions(incoming);
+	renderIncomingFolderOptions();
+	incomingModal.classList.add("open");
+}
+
+function closeIncomingModal() {
+	incomingModal.classList.remove("open");
+}
+
+function renderIncomingFolderOptions() {
+	const folders = [
+		...new Set([...ALL_FOLDERS, ...ALL_VIDEOS.map((v) => v.folder || "/"), "/"]),
+	].sort();
+	incomingFolderOptions.innerHTML = "";
+	for (const f of folders) {
+		const opt = document.createElement("div");
+		opt.className =
+			"folder-option" + (f === incomingSelectedFolder ? " selected" : "");
+		opt.innerHTML =
+			'<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>' +
+			(f === "/" ? "Root (/)" : escHtml(f));
+		opt.addEventListener("click", () => {
+			incomingSelectedFolder = f;
+			renderIncomingFolderOptions();
+		});
+		incomingFolderOptions.appendChild(opt);
+	}
+}
+
+function renderIncomingTagOptions(incoming) {
+	incomingTagOptions.innerHTML = "";
+	const incomingHashes = new Set(incoming.map((v) => v.hash).filter(Boolean));
+	for (const tag of ALL_TAGS) {
+		const selectedCount = incoming.filter(
+			(v) => incomingHashes.has(v.hash) && (v.tags || []).includes(tag.id),
+		).length;
+		const allSelected = incoming.length > 0 && selectedCount === incoming.length;
+		const row = document.createElement("label");
+		row.className = "tag-option";
+		row.innerHTML =
+			'<input type="checkbox" ' +
+			(allSelected ? "checked" : "") +
+			'><span class="tag-option-name">' +
+			renderTagChip(tag) +
+			"</span>";
+		const box = row.querySelector("input");
+		box.addEventListener("change", () => {
+			if (box.checked) incomingSelectedTagIDs.add(tag.id);
+			else incomingSelectedTagIDs.delete(tag.id);
+		});
+		incomingTagOptions.appendChild(row);
+	}
+}
+
+async function clearNewStatus(paths, all = false) {
+	const res = await fetch("/api/videos/new/clear", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ all, paths }),
+	});
+	return res.ok;
+}
+
+async function forgetVideos(paths, hashes = [], all = false) {
+	const res = await fetch("/api/videos/new/forget", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ all, paths, hashes }),
+	});
+	return res.ok;
 }
 
 // upload modal
@@ -1652,6 +1835,18 @@ selectMoveBtn.addEventListener("click", () => {
 		filtered.find((v) => selectedPaths.has(v.path)) || filtered[0];
 	openMoveModal(first);
 });
+selectForgetBtn.addEventListener("click", async () => {
+	if (!selectedPaths.size) return;
+	const paths = [...selectedPaths];
+	const ok = await forgetVideos(paths, [], false);
+	if (!ok) {
+		toast("Forget operation failed", "error");
+		return;
+	}
+	await refresh();
+	exitSelectMode();
+	toast("Forgot " + paths.length + " file(s)", "success");
+});
 selectTagBtn.addEventListener("click", () => {
 	if (!selectedPaths.size) return;
 	const targets = filtered.filter((v) => selectedPaths.has(v.path));
@@ -2005,6 +2200,99 @@ dupModal.addEventListener("click", (e) => {
 	if (e.target === dupModal) closeDuplicateModal();
 });
 dupResolveAllBtn.addEventListener("click", resolveAllDuplicateGroups);
+
+incomingReviewBtn.addEventListener("click", () => {
+	activeIncomingFilter = true;
+	activeFolder = "__all__";
+	buildIncomingNav();
+	buildFolderNav();
+	render();
+});
+incomingMassSortBtn.addEventListener("click", openIncomingModal);
+incomingDismissBtn.addEventListener("click", () => {
+	incomingBannerDismissed = true;
+	incomingBanner.classList.remove("visible");
+});
+incomingClose.addEventListener("click", closeIncomingModal);
+incomingCancelBtn.addEventListener("click", closeIncomingModal);
+incomingModal.addEventListener("click", (e) => {
+	if (e.target === incomingModal) closeIncomingModal();
+});
+incomingMarkAllBtn.addEventListener("click", async () => {
+	const incomingPaths = ALL_VIDEOS.filter((v) => Boolean(v.is_new)).map((v) => v.path);
+	if (!incomingPaths.length) return;
+	const ok = await clearNewStatus(incomingPaths, false);
+	if (!ok) {
+		toast("Failed to mark incoming files as reviewed", "error");
+		return;
+	}
+	await refresh();
+	toast("Marked all incoming as reviewed", "success");
+});
+incomingMarkReviewedBtn.addEventListener("click", async () => {
+	const incoming = ALL_VIDEOS.filter((v) => Boolean(v.is_new)).map((v) => v.path);
+	if (!incoming.length) {
+		closeIncomingModal();
+		return;
+	}
+	const ok = await clearNewStatus(incoming, true);
+	if (!ok) {
+		toast("Failed to mark incoming files as reviewed", "error");
+		return;
+	}
+	closeIncomingModal();
+	await refresh();
+});
+incomingConfirmBtn.addEventListener("click", async () => {
+	const incoming = ALL_VIDEOS.filter((v) => Boolean(v.is_new));
+	if (!incoming.length) {
+		closeIncomingModal();
+		return;
+	}
+	let errs = 0;
+	const reviewedPaths = [];
+	for (const video of incoming) {
+		if ((video.folder || "/") === incomingSelectedFolder) {
+			reviewedPaths.push(video.path);
+			continue;
+		}
+		const res = await fetch("/api/move", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				path: video.path,
+				dest_folder: incomingSelectedFolder,
+			}),
+		});
+		if (!res.ok) errs++;
+		else reviewedPaths.push(video.path);
+	}
+	const incomingHashes = [...new Set(incoming.map((v) => v.hash).filter(Boolean))];
+	let tagErrs = 0;
+	if (incomingSelectedTagIDs.size && incomingHashes.length) {
+		for (const hash of incomingHashes) {
+			for (const tagID of incomingSelectedTagIDs) {
+				const ok = await setTagAssignment(hash, tagID, true);
+				if (!ok) tagErrs++;
+			}
+		}
+	}
+	const ok = await clearNewStatus(reviewedPaths, false);
+	if (!ok) {
+		toast("Moves completed but clear status failed", "error");
+	}
+	closeIncomingModal();
+	await refresh();
+	if (errs || tagErrs) {
+		toast(
+			(errs ? errs + " move(s) failed. " : "") +
+				(tagErrs ? tagErrs + " tag update(s) failed." : ""),
+			"error",
+		);
+	} else {
+		toast("Incoming media mass sorted", "success");
+	}
+});
 
 collectionPickerClose.addEventListener("click", closeCollectionPicker);
 collectionPickerCancelBtn.addEventListener("click", closeCollectionPicker);

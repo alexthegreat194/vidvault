@@ -24,6 +24,7 @@ type server struct {
 	favorites   *FavoritesStore
 	tags        *TagsStore
 	collections *WatchCollectionsStore
+	seenFiles   *SeenFilesStore
 	videoCache  *videoScanCache
 	mux         *http.ServeMux
 }
@@ -46,12 +47,17 @@ func newServer(root string) (*server, error) {
 	if err != nil {
 		return nil, err
 	}
+	seenFiles, err := newSeenFilesStore()
+	if err != nil {
+		return nil, err
+	}
 
 	s := &server{
 		root:        root,
 		favorites:   favorites,
 		tags:        tags,
 		collections: collections,
+		seenFiles:   seenFiles,
 		videoCache:  newVideoScanCache(),
 		mux:         http.NewServeMux(),
 	}
@@ -78,6 +84,8 @@ func newServer(root string) (*server, error) {
 	s.mux.HandleFunc("/api/move", s.handleMove)
 	s.mux.HandleFunc("/api/delete", s.handleDelete)
 	s.mux.HandleFunc("/api/upload", s.handleUpload)
+	s.mux.HandleFunc("POST /api/videos/new/clear", s.handleClearNewVideos)
+	s.mux.HandleFunc("POST /api/videos/new/forget", s.handleForgetVideos)
 	s.mux.HandleFunc("/video", s.handleVideo)
 	serverLog.Info("routes registered", "root", root)
 	return s, nil
@@ -158,6 +166,11 @@ func (s *server) handleVideos(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	if err := s.seenFiles.MarkVideos(s.root, videos); err != nil {
+		serverLog.Error("failed updating seen files state", "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	for i := range videos {
 		videos[i].Favorite = s.favorites.IsFavorite(videos[i].Hash)
 		videos[i].Tags = s.tags.TagsForHash(videos[i].Hash)
@@ -204,17 +217,7 @@ func (s *server) handleVideosStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	count := 0
-	_, err := scanVideosWithCallback(s.root, s.videoCache, func(video Video) error {
-		select {
-		case <-r.Context().Done():
-			return r.Context().Err()
-		default:
-		}
-		s.applyVideoMetadata(&video)
-		count++
-		return writeEvent("video", video)
-	})
+	videos, err := scanVideos(s.root, s.videoCache)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			return
@@ -223,10 +226,76 @@ func (s *server) handleVideosStream(w http.ResponseWriter, r *http.Request) {
 		writeEvent("scan_error", map[string]any{"message": err.Error()})
 		return
 	}
+	if err := s.seenFiles.MarkVideos(s.root, videos); err != nil {
+		serverLog.Error("failed updating seen files state for stream", "error", err)
+		_ = writeEvent("scan_error", map[string]any{"message": err.Error()})
+		return
+	}
+	count := 0
+	for i := range videos {
+		select {
+		case <-r.Context().Done():
+			return
+		default:
+		}
+		s.applyVideoMetadata(&videos[i])
+		count++
+		if err := writeEvent("video", videos[i]); err != nil {
+			return
+		}
+	}
 	_ = writeEvent("scan_complete", map[string]any{
 		"count":       count,
 		"duration_ms": time.Since(start).Milliseconds(),
 	})
+}
+
+func (s *server) handleClearNewVideos(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		All    bool     `json:"all"`
+		Paths  []string `json:"paths"`
+		Hashes []string `json:"hashes"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	videos, err := scanVideos(s.root, s.videoCache)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := s.seenFiles.MarkVideos(s.root, videos); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := s.seenFiles.MarkReviewedForVideos(videos, req.All, req.Paths, req.Hashes); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func (s *server) handleForgetVideos(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		All    bool     `json:"all"`
+		Paths  []string `json:"paths"`
+		Hashes []string `json:"hashes"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	videos, err := scanVideos(s.root, s.videoCache)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := s.seenFiles.ForgetForVideos(videos, req.All, req.Paths, req.Hashes); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }
 
 func (s *server) handleFavorites(w http.ResponseWriter, r *http.Request) {

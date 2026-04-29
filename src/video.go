@@ -40,6 +40,7 @@ type Video struct {
 	Modified time.Time `json:"modified"` // file last modified timestamp
 	Hash     string    `json:"hash"`     // SHA-256 hash of the file
 	Favorite bool      `json:"is_favorite"`
+	IsNew    bool      `json:"is_new"`
 	Tags     []string  `json:"tags,omitempty"` // list of tag IDs applied to this video hash
 }
 
