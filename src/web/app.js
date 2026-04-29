@@ -521,7 +521,10 @@ function setPinOverlayVisible(show, message) {
 	pinGateOverlay.hidden = !show;
 	pinGateOverlay.setAttribute("aria-hidden", show ? "false" : "true");
 	document.body.classList.toggle("pin-gate-open", Boolean(show));
-	if (pinGateInput) pinGateInput.disabled = !show;
+	if (pinGateInput) {
+		pinGateInput.disabled = !show;
+		if (!show) pinGateInput.readOnly = false;
+	}
 	if (pinGateError) {
 		if (message) {
 			pinGateError.hidden = false;
@@ -532,6 +535,14 @@ function setPinOverlayVisible(show, message) {
 		}
 	}
 	if (show && pinGateInput) {
+		pinGateInput.readOnly = true;
+		pinGateInput.addEventListener(
+			"focus",
+			() => {
+				pinGateInput.readOnly = false;
+			},
+			{ once: true },
+		);
 		queueMicrotask(() => pinGateInput.focus());
 	}
 }

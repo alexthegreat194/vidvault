@@ -11,6 +11,9 @@ Bugs:
 - [x] adding/updating tags currently triggers a full video refetch; switch to a tag-specific API flow that fetches only videos needing tag updates
 - [x] after any select-mode operation completes, automatically disable/exit select mode
 - [ ] has trouble with multiple hashes
+- [ ] 416 Requested Range Not Satisfiable
+- [ ] disable password managers
+- [ ] duplicate manager opens on a new page; the overlap still happens; duplication manager identified 30 files as being empty, they are recognized as the same file
 
 Tweaks:
 - [x] add all files to top of list
@@ -50,6 +53,10 @@ keeps track of when something was uploaded, if something was uploaded before the
 - [ ] dont open duplucate manager after refresh
 - [ ] when dragging, make little icon
 - [ ] lock button is visible even when pin is not visible
+- [ ] volume control and setting for viewing a video
+- [ ] handle the edge case for nested folders
+- [ ] scroll to bottom button
+
 
 Analytics:
 - [ ] Most watched videos: videos that were watched the most amount of times, ability to sort by most watched

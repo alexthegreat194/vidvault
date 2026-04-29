@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
-# Build a arm64-ready Docker image (linux/arm64 by default).
+# Build an amd64 Docker image (linux/amd64 by default). Use on x86_64 hosts
+# (e.g. ZimaBlade / ZimaOS, Intel NUC, typical Linux servers).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-IMAGE="${IMAGE:-alexthegreat1941/vidvault:arm64}"
-PLATFORM="${PLATFORM:-linux/arm64}"
+IMAGE="${IMAGE:-alexthegreat1941/vidvault:amd64}"
+PLATFORM="${PLATFORM:-linux/amd64}"
 PUSH="${PUSH:-0}"
 LOAD="${LOAD:-1}"
 PROVENANCE="${PROVENANCE:-false}"
 
-echo "Building image for arm64..."
+echo "Building image for amd64..."
 echo "  image:    $IMAGE"
 echo "  platform: $PLATFORM"
 

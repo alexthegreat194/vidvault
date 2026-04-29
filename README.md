@@ -175,6 +175,7 @@ follow file moves/renames.
 | [`Dockerfile`](Dockerfile) | Multi-stage image: Alpine runtime, [`docker-entrypoint.sh`](docker-entrypoint.sh) maps `VIDVAULT_*` env → flags, then `CMD` runs `/vidvault -p 8765 /data`. |
 | [`scripts/docker-build.sh`](scripts/docker-build.sh) | `docker build` for a generic local image (`IMAGE`, optional `PLATFORM`). |
 | [`scripts/docker-run.sh`](scripts/docker-run.sh) | Calls `docker-build.sh`, then `docker run` with volume and port mapping. |
+| [`scripts/docker-build-amd64.sh`](scripts/docker-build-amd64.sh) | `docker buildx` for `linux/amd64` (optional push/load; x86_64). |
 | [`scripts/docker-build-arm64.sh`](scripts/docker-build-arm64.sh) | `docker buildx` for `linux/arm64` (optional push/load). |
 | [`package.json`](package.json) | `npm run format` — Prettier on `src/web/**/*.js`. |
 | `src/main.go` | CLI (`-p`, `-d`, `-disable-browser`, `-pin`), resolve media root, print URLs, optional browser, start server. |

@@ -6,8 +6,8 @@
   <div class="pin-gate-dialog" role="dialog" aria-labelledby="pin-gate-title">
     <div class="logo pin-gate-logo">VID<span>VAULT</span></div>
     <p id="pin-gate-title" class="pin-gate-title">Enter PIN to continue</p>
-    <form id="pin-gate-form" class="pin-gate-form" autocomplete="off">
-      <input type="password" id="pin-gate-input" class="pin-gate-input" autocomplete="current-password" inputmode="numeric" aria-label="PIN">
+    <form id="pin-gate-form" class="pin-gate-form" autocomplete="off" data-lpignore="true" data-form-type="other">
+      <input type="password" id="pin-gate-input" class="pin-gate-input" name="vv_pin" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" inputmode="numeric" aria-label="PIN" data-lpignore="true" data-1p-ignore data-bwignore data-form-type="other">
       <p id="pin-gate-error" class="pin-gate-error" hidden></p>
       <button type="submit" class="btn pin-gate-submit">Unlock</button>
     </form>
