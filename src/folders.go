@@ -93,7 +93,10 @@ func makeDirectory(root string, dirName string) error {
 func removeDirectory(root string, dirName string) error {
 	foldersLog.Debug("remove directory requested", "root", root, "dir", dirName)
 	clean := filepath.Clean(filepath.FromSlash(dirName))
-	if clean == "." || strings.HasPrefix(clean, "..") {
+	if clean == "." || clean == "" || clean == string(filepath.Separator) {
+		return errors.New("cannot delete root directory")
+	}
+	if strings.HasPrefix(clean, "..") {
 		return errors.New("Directory starts with ..")
 	}
 	rootAbs, _ := filepath.Abs(root)

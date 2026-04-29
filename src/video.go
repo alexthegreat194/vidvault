@@ -45,10 +45,14 @@ type Video struct {
 }
 
 var (
-	errEmptyVideoPath = errors.New("missing path")
-	errForbiddenPath  = errors.New("forbidden")
-	errVideoNotFound  = errors.New("video not found")
-	errNotAFile       = errors.New("path is not a file")
+	errEmptyVideoPath       = errors.New("missing path")
+	errForbiddenPath        = errors.New("forbidden")
+	errVideoNotFound        = errors.New("video not found")
+	errNotAFile             = errors.New("path is not a file")
+	errRenameEmptyName      = errors.New("empty name")
+	errRenameInvalidName    = errors.New("invalid name")
+	errRenameExists         = errors.New("destination exists")
+	errRenameUnsupportedExt = errors.New("unsupported extension")
 )
 
 func isValidVideoExtention(ext string) bool {
@@ -279,4 +283,98 @@ func deleteVideoByPath(root string, relPath string) error {
 	}
 	videoLog.Info("video deleted", "path", relPath, "abs_path", fileAbs)
 	return nil
+}
+
+// renameVideoFile moves a video file to a new basename in the same directory.
+// newName must be a single path segment (no slashes). If it has no extension,
+// the source file's extension is preserved. If it has an extension, it must be
+// a supported video extension. Returns the new slash-separated path relative to root.
+func renameVideoFile(root string, relPath string, newName string) (string, error) {
+	videoLog.Debug("rename requested", "root", root, "path", relPath, "newName", newName)
+	if strings.TrimSpace(relPath) == "" {
+		return "", errEmptyVideoPath
+	}
+	clean := filepath.Clean(filepath.FromSlash(relPath))
+	if clean == "." || strings.HasPrefix(clean, "..") {
+		return "", errForbiddenPath
+	}
+
+	rootAbs, err := filepath.Abs(root)
+	if err != nil {
+		return "", err
+	}
+	srcAbs, err := filepath.Abs(filepath.Join(root, clean))
+	if err != nil {
+		return "", err
+	}
+	if !strings.HasPrefix(srcAbs, rootAbs+string(os.PathSeparator)) {
+		return "", errForbiddenPath
+	}
+
+	info, err := os.Stat(srcAbs)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return "", errVideoNotFound
+		}
+		return "", err
+	}
+	if info.IsDir() {
+		return "", errNotAFile
+	}
+
+	origExt := strings.ToLower(filepath.Ext(srcAbs))
+	if !videoExts[origExt] {
+		return "", errNotAFile
+	}
+
+	newName = strings.TrimSpace(newName)
+	if newName == "" {
+		return "", errRenameEmptyName
+	}
+	if strings.ContainsAny(newName, `/\`) || strings.Contains(newName, "..") {
+		return "", errRenameInvalidName
+	}
+	if filepath.Base(newName) != newName {
+		return "", errRenameInvalidName
+	}
+
+	destBase := newName
+	if ext := strings.ToLower(filepath.Ext(destBase)); ext == "" {
+		destBase = destBase + origExt
+	} else if !videoExts[ext] {
+		return "", errRenameUnsupportedExt
+	}
+
+	destAbs := filepath.Join(filepath.Dir(srcAbs), destBase)
+	destAbs, err = filepath.Abs(destAbs)
+	if err != nil {
+		return "", err
+	}
+	if filepath.Clean(filepath.Dir(srcAbs)) != filepath.Clean(filepath.Dir(destAbs)) {
+		return "", errForbiddenPath
+	}
+
+	if filepath.Clean(srcAbs) == filepath.Clean(destAbs) {
+		relOut, err := filepath.Rel(rootAbs, srcAbs)
+		if err != nil {
+			return filepath.ToSlash(clean), nil
+		}
+		return filepath.ToSlash(relOut), nil
+	}
+
+	if _, err := os.Stat(destAbs); err == nil {
+		return "", errRenameExists
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return "", err
+	}
+
+	if err := os.Rename(srcAbs, destAbs); err != nil {
+		return "", err
+	}
+	relOut, err := filepath.Rel(rootAbs, destAbs)
+	if err != nil {
+		return filepath.ToSlash(filepath.Join(filepath.ToSlash(filepath.Dir(clean)), filepath.Base(destAbs))), nil
+	}
+	videoLog.Info("video renamed", "from", relPath, "to", filepath.ToSlash(relOut))
+	return filepath.ToSlash(relOut), nil
 }

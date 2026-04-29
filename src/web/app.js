@@ -272,13 +272,17 @@ function renderTagChip(tag) {
 	);
 }
 
-function renderVideoTagChips(tagIDs) {
+function renderVideoTagChipsInner(tagIDs) {
 	if (!Array.isArray(tagIDs) || !tagIDs.length) return "";
 	const chips = tagIDs
 		.map((id) => TAG_MAP[id])
 		.filter(Boolean)
 		.map((tag) => renderTagChip(tag))
 		.join("");
+	return chips || "";
+}
+function renderVideoTagChips(tagIDs) {
+	const chips = renderVideoTagChipsInner(tagIDs);
 	if (!chips) return "";
 	return '<div class="card-tags">' + chips + "</div>";
 }
@@ -659,38 +663,40 @@ function buildFolderNav() {
 				const src = e.dataTransfer.getData("text/plain");
 				if (src) await moveVideo(src, f);
 			});
-			const del = document.createElement("button");
-			del.className = "del-folder-btn";
-			del.title = "Delete folder (moves files to root)";
-			del.textContent = "✕";
-			del.addEventListener("click", async (e) => {
-				e.stopPropagation();
-				const warnMsg = FOLDER_META[f]?.has_other_files
-					? "\n\n⚠ This folder contains non-video files. They will also be moved to root."
-					: "";
-				if (
-					!confirm(
-						'Delete folder "' +
-							f +
-							'"? All files inside will be moved to root.' +
-							warnMsg,
+			if (f !== "/") {
+				const del = document.createElement("button");
+				del.className = "del-folder-btn";
+				del.title = "Delete folder (moves files to root)";
+				del.textContent = "✕";
+				del.addEventListener("click", async (e) => {
+					e.stopPropagation();
+					const warnMsg = FOLDER_META[f]?.has_other_files
+						? "\n\n⚠ This folder contains non-video files. They will also be moved to root."
+						: "";
+					if (
+						!confirm(
+							'Delete folder "' +
+								f +
+								'"? All files inside will be moved to root.' +
+								warnMsg,
+						)
 					)
-				)
-					return;
-				const res = await fetch("/api/rmdir", {
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ folder: f }),
+						return;
+					const res = await fetch("/api/rmdir", {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({ folder: f }),
+					});
+					if (res.ok) {
+						if (activeFolder === f) activeFolder = "__all__";
+						toast("Deleted " + f, "success");
+						await refresh();
+					} else {
+						toast("Delete failed: " + (await res.text()), "error");
+					}
 				});
-				if (res.ok) {
-					if (activeFolder === f) activeFolder = "__all__";
-					toast("Deleted " + f, "success");
-					await refresh();
-				} else {
-					toast("Delete failed: " + (await res.text()), "error");
-				}
-			});
-			btn.appendChild(del);
+				btn.appendChild(del);
+			}
 		}
 		folderList.appendChild(btn);
 	}
@@ -861,13 +867,18 @@ function render() {
 			escHtml(v.ext.slice(1)) +
 			"</span>" +
 			(v.is_new ? '<span class="card-ext">new</span>' : "") +
+			(() => {
+				const inner = renderVideoTagChipsInner(v.tags || []);
+				return inner
+					? '<span class="card-tags card-tags--badges">' + inner + "</span>"
+					: "";
+			})() +
 			"</div>" +
 			'<span class="card-path">' +
 			escHtml(formatBytes(v.size || 0)) +
 			" • " +
 			escHtml(formatModified(v.modified)) +
 			"</span>" +
-			renderVideoTagChips(v.tags || []) +
 			"</div>";
 		const vid = card.querySelector("video");
 		applyDefaultVideoFlags(vid);
@@ -908,6 +919,15 @@ function render() {
 		card.addEventListener("click", (e) => {
 			if (e.target.closest(".drag-handle")) return;
 			if (e.target.closest(".fav-toggle")) return;
+			if (e.target.closest(".check-overlay")) {
+				if (!selectMode) {
+					selectMode = true;
+					document.body.classList.add("select-mode");
+					selectBtn.classList.add("active");
+				}
+				toggleSelect(v.path, card);
+				return;
+			}
 			if (selectMode) {
 				toggleSelect(v.path, card);
 			} else {
@@ -1039,6 +1059,7 @@ document.addEventListener("keydown", (e) => {
 const ctxMenu = document.getElementById("ctx-menu"),
 	ctxTagsEl = document.getElementById("ctx-tags"),
 	ctxMoveEl = document.getElementById("ctx-move"),
+	ctxRenameEl = document.getElementById("ctx-rename"),
 	ctxDeleteEl = document.getElementById("ctx-delete"),
 	ctxForgetEl = document.getElementById("ctx-forget");
 let ctxVideo = null;
@@ -1059,6 +1080,20 @@ ctxTagsEl.addEventListener("click", () => {
 });
 ctxMoveEl.addEventListener("click", () => {
 	if (ctxVideo) openMoveModal(ctxVideo);
+});
+ctxRenameEl.addEventListener("click", async () => {
+	if (!ctxVideo) return;
+	const next = prompt("Rename file (new base name)", ctxVideo.name);
+	if (next == null) return;
+	const trimmed = next.trim();
+	if (!trimmed) return;
+	const res = await renameVideoPath(ctxVideo.path, trimmed);
+	if (res.ok) {
+		toast("Renamed file", "success");
+		await refresh();
+	} else {
+		toast("Rename failed: " + res.message, "error");
+	}
 });
 ctxForgetEl.addEventListener("click", async () => {
 	if (!ctxVideo) return;
@@ -1881,6 +1916,7 @@ selectClearBtn.addEventListener("click", () => {
 
 // tags (sidebar)
 newTagBtn.addEventListener("click", () => {
+	tagsSection.classList.remove("collapsed");
 	sidebarTagForm.classList.add("visible");
 	sidebarTagInput.value = "";
 	sidebarTagInput.focus();
@@ -1915,6 +1951,7 @@ sidebarTagInput.addEventListener("keydown", (e) => {
 
 // collections (sidebar)
 newCollectionBtn.addEventListener("click", () => {
+	collectionsSection.classList.remove("collapsed");
 	sidebarCollectionForm.classList.add("visible");
 	sidebarCollectionInput.value = "";
 	sidebarCollectionInput.focus();
@@ -1954,6 +1991,7 @@ foldersCollapseBtn.addEventListener("click", () => {
 
 // new folder (sidebar)
 newFolderBtn.addEventListener("click", () => {
+	foldersSection.classList.remove("collapsed");
 	sidebarFolderForm.classList.add("visible");
 	sidebarFolderInput.value = "";
 	sidebarFolderInput.focus();
@@ -2007,6 +2045,20 @@ async function deleteVideoPath(path) {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ path }),
+		});
+		if (res.ok) return { ok: true, message: "" };
+		return { ok: false, message: await res.text() };
+	} catch (e) {
+		return { ok: false, message: "request failed" };
+	}
+}
+
+async function renameVideoPath(path, name) {
+	try {
+		const res = await fetch("/api/rename", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ path, name }),
 		});
 		if (res.ok) return { ok: true, message: "" };
 		return { ok: false, message: await res.text() };
@@ -2280,6 +2332,9 @@ incomingConfirmBtn.addEventListener("click", async () => {
 	const ok = await clearNewStatus(reviewedPaths, false);
 	if (!ok) {
 		toast("Moves completed but clear status failed", "error");
+	}
+	if (ok && !errs && !tagErrs) {
+		activeIncomingFilter = false;
 	}
 	closeIncomingModal();
 	await refresh();

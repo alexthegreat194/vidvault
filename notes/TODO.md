@@ -17,27 +17,41 @@ Tweaks:
 
 Features:
 - [x] sort by date uploaded
-- [ ] new section on the client page: "need to be sorted" or "recently added" 
+- [x] new section on the client page: "need to be sorted" or "recently added" 
 keeps track of when something was uploaded, if something was uploaded before the last was checked, it will prompt you and give you the option to move it to a folder 
 - [x] tag videos: tag videos and search by tag.
-- [ ] auto-tagging follow-up: learn from existing tag assignments and suggest/apply tags automatically for newly added videos
-- [ ] watch collections: ability to watch videos next to each other in some type of grid
+- [x] watch collections: ability to watch videos next to each other in some type of grid
 - [x] favorite videos:
 - [x] the ability to delete videos: make this a super last resort and with lots of ui to stop the user from doing it
 - [x] auto detect duplicates with embeddings?
-- [ ] videos that were watched the most amount of times, ability to sort by most watched
-- [ ] master controls on collections
-  - mass play
-  - mass volume control
-- [ ] change grid width for collections
+
+- [x] after mass sort, deactivate "Need sorting"
+- [x] when the "+" button is selected, expand corresponding menu in the side nav
+- [x] do not allow the root directory to be deleted
+- [x] when hovering, the circle for selecting all should be visible. When selected select mode is active
+- [x] add the tags we create next to the visaul "mp4" and "new" tags
+- [x] the opition to rename files
+
+- [ ] Collection tweaks:
+  - [ ] master controls on collections: (mass play button, mass volume control)
+  - [ ] change grid width for collections: (4,3,2,1)
+  - [ ] make a folder a collection: button when clicked give you the option to make a collection 
+
+- [ ] Tag tweaks:
+  - [ ] for tags: instead of checkboxes, do a mass add remove and an endpoint to do it in bulk, similar to how wo do in the mass sort
+
 - [ ] status bar for loading
 - [ ] thumbnail caching? cahce directory 
 - [ ] live preview
 - [ ] more info on files that dont match types
 - [ ] select button is hidden
 - [ ] Password able to be set in the ui (pin/password)
-- [ ] for tags: instead of checkboxes, do a mass add remove and an endpoint to do it in bulk
 - [ ] after mass upload, then re render
 - [ ] dont open duplucate manager after refresh
-- [ ]  make a folder a collection
 - [ ] when dragging, make little icon
+
+Analytics:
+- [ ] Most watched videos: videos that were watched the most amount of times, ability to sort by most watched
+
+2.0:
+- [ ] auto-tagging follow-up: learn from existing tag assignments and suggest/apply tags automatically for newly added videos

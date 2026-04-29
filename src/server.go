@@ -82,6 +82,7 @@ func newServer(root string) (*server, error) {
 	s.mux.HandleFunc("/api/mkdir", s.handleMkdir)
 	s.mux.HandleFunc("/api/rmdir", s.handleRmdir)
 	s.mux.HandleFunc("/api/move", s.handleMove)
+	s.mux.HandleFunc("/api/rename", s.handleRename)
 	s.mux.HandleFunc("/api/delete", s.handleDelete)
 	s.mux.HandleFunc("/api/upload", s.handleUpload)
 	s.mux.HandleFunc("POST /api/videos/new/clear", s.handleClearNewVideos)
@@ -662,6 +663,51 @@ func (s *server) handleMove(w http.ResponseWriter, r *http.Request) {
 	}
 	serverLog.Debug("file moved", "path", req.Path, "dest", req.DestFolder)
 	w.WriteHeader(http.StatusOK)
+}
+
+func (s *server) handleRename(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Path string `json:"path"`
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.Path) == "" {
+		serverLog.Error("invalid rename payload", "error", err)
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	newPath, err := renameVideoFile(s.root, req.Path, req.Name)
+	if err != nil {
+		serverLog.Error("rename failed", "path", req.Path, "error", err)
+		switch {
+		case errors.Is(err, errEmptyVideoPath):
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		case errors.Is(err, errForbiddenPath):
+			http.Error(w, err.Error(), http.StatusForbidden)
+		case errors.Is(err, errVideoNotFound):
+			http.Error(w, err.Error(), http.StatusNotFound)
+		case errors.Is(err, errNotAFile):
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		case errors.Is(err, errRenameEmptyName):
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		case errors.Is(err, errRenameInvalidName):
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		case errors.Is(err, errRenameExists):
+			http.Error(w, err.Error(), http.StatusConflict)
+		case errors.Is(err, errRenameUnsupportedExt):
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		default:
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]string{"path": newPath})
+	serverLog.Debug("video renamed via api", "path", req.Path, "new_path", newPath)
 }
 
 func (s *server) handleUpload(w http.ResponseWriter, r *http.Request) {
