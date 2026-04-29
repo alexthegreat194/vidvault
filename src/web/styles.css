@@ -243,8 +243,15 @@
   .collection-picker-option:hover { background:rgba(255,255,255,.04); color:var(--text); }
   .collection-picker-option.selected { background:rgba(232,255,71,.07); color:var(--accent); border-color:rgba(232,255,71,.2); }
   .collection-picker-option .count { margin-left:auto; font-size:10px; color:var(--muted); }
-  .watch-collection-actions { display:flex; align-items:center; gap:8px; }
+  .watch-collection-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+  .watch-volume-control,.watch-grid-control { display:inline-flex; align-items:center; gap:6px; color:var(--dim); font-size:11px; }
+  .watch-volume-control input { width:90px; accent-color:var(--accent); }
+  .watch-grid-control select { min-width:54px; }
   .watch-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(320px,1fr)); gap:12px; }
+  .watch-grid.cols-4 { grid-template-columns:repeat(4, minmax(0,1fr)); }
+  .watch-grid.cols-3 { grid-template-columns:repeat(3, minmax(0,1fr)); }
+  .watch-grid.cols-2 { grid-template-columns:repeat(2, minmax(0,1fr)); }
+  .watch-grid.cols-1 { grid-template-columns:repeat(1, minmax(0,1fr)); }
   .watch-tile { border:1px solid var(--border); border-radius:var(--radius); background:var(--bg); overflow:hidden; display:flex; flex-direction:column; }
   .watch-tile video { width:100%; aspect-ratio:16/9; background:#000; display:block; }
   .watch-tile-meta { padding:8px 10px; display:flex; align-items:center; gap:8px; }
@@ -252,6 +259,9 @@
   .watch-tile-path { font-size:10px; color:var(--dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:50%; }
   .watch-tile-remove { background:none; border:none; color:var(--dim); cursor:pointer; font-size:12px; }
   .watch-tile-remove:hover { color:#ff5555; }
+  .watch-folder-collection-btn { margin-left:4px; background:none; border:none; color:transparent; cursor:pointer; font-size:12px; padding:0 2px; line-height:1; flex-shrink:0; transition:color .1s; }
+  .folder-btn:hover .watch-folder-collection-btn { color:var(--dim); }
+  .folder-btn .watch-folder-collection-btn:hover { color:var(--accent) !important; }
   .watch-collection-empty { border:1px solid var(--border); border-radius:var(--radius); padding:18px; color:var(--dim); font-size:12px; background:var(--bg); text-align:center; }
   /* select mode */
   .check-overlay { position:absolute; top:8px; left:8px; width:20px; height:20px; border-radius:50%; border:2px solid rgba(255,255,255,.4); background:rgba(0,0,0,.5); display:flex; align-items:center; justify-content:center; opacity:0; transition:opacity .15s,background .15s,border-color .15s; z-index:3; pointer-events:auto; cursor:pointer; }

@@ -311,6 +311,22 @@
         <div class="watch-collection-subtitle" id="watch-collection-subtitle"></div>
       </div>
       <div class="watch-collection-actions">
+        <button class="btn" id="watch-collection-play-all-btn">Play all</button>
+        <button class="btn" id="watch-collection-pause-all-btn">Pause all</button>
+        <button class="btn" id="watch-collection-mute-all-btn">Mute all</button>
+        <label class="watch-volume-control" for="watch-collection-volume-input">
+          Vol
+          <input id="watch-collection-volume-input" type="range" min="0" max="1" step="0.05" value="1">
+        </label>
+        <label class="watch-grid-control" for="watch-collection-grid-cols">
+          Grid
+          <select class="btn" id="watch-collection-grid-cols">
+            <option value="4">4</option>
+            <option value="3">3</option>
+            <option value="2">2</option>
+            <option value="1">1</option>
+          </select>
+        </label>
         <button class="btn" id="watch-collection-rename-btn">Rename</button>
         <button class="btn" id="watch-collection-delete-btn">Delete</button>
         <button class="close-btn" id="watch-collection-close">✕</button>

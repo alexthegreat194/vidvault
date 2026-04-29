@@ -78,6 +78,7 @@ func newServer(root string) (*server, error) {
 	s.mux.HandleFunc("POST /api/collections/delete", s.handleDeleteCollection)
 	s.mux.HandleFunc("POST /api/collections/videos/set", s.handleSetCollectionVideo)
 	s.mux.HandleFunc("POST /api/collections/videos/bulk", s.handleBulkCollectionVideos)
+	s.mux.HandleFunc("POST /api/collections/from-folder", s.handleCreateCollectionFromFolder)
 	s.mux.HandleFunc("/api/folders", s.handleFolders)
 	s.mux.HandleFunc("/api/mkdir", s.handleMkdir)
 	s.mux.HandleFunc("/api/rmdir", s.handleRmdir)
@@ -529,6 +530,86 @@ func (s *server) handleBulkCollectionVideos(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+func (s *server) handleCreateCollectionFromFolder(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Folder string `json:"folder"`
+		Name   string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		serverLog.Error("failed parsing create collection from folder payload", "error", err)
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	req.Folder = strings.TrimSpace(req.Folder)
+	req.Name = strings.TrimSpace(req.Name)
+	if req.Folder == "" {
+		http.Error(w, "missing folder", http.StatusBadRequest)
+		return
+	}
+	if req.Name == "" {
+		req.Name = req.Folder
+	}
+
+	folders, err := getFolderMetadata(s.root)
+	if err != nil {
+		serverLog.Error("failed loading folder metadata for collection snapshot", "error", err)
+		http.Error(w, "failed loading folders", http.StatusInternalServerError)
+		return
+	}
+	foundFolder := false
+	for _, folder := range folders {
+		if folder.Name == req.Folder {
+			foundFolder = true
+			break
+		}
+	}
+	if !foundFolder {
+		http.Error(w, "folder not found", http.StatusNotFound)
+		return
+	}
+
+	videos, err := scanVideos(s.root, s.videoCache)
+	if err != nil {
+		serverLog.Error("failed scanning videos for collection snapshot", "folder", req.Folder, "error", err)
+		http.Error(w, "failed scanning videos", http.StatusInternalServerError)
+		return
+	}
+	seen := map[string]struct{}{}
+	hashes := make([]string, 0)
+	for _, video := range videos {
+		if video.Folder != req.Folder || strings.TrimSpace(video.Hash) == "" {
+			continue
+		}
+		if _, ok := seen[video.Hash]; ok {
+			continue
+		}
+		seen[video.Hash] = struct{}{}
+		hashes = append(hashes, video.Hash)
+	}
+	if len(hashes) == 0 {
+		http.Error(w, "folder has no playable videos", http.StatusBadRequest)
+		return
+	}
+
+	collection, err := s.collections.Create(req.Name)
+	if err != nil {
+		serverLog.Error("failed creating folder collection snapshot", "folder", req.Folder, "name", req.Name, "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := s.collections.AddVideos(collection.ID, hashes); err != nil {
+		serverLog.Error("failed adding videos to folder collection snapshot", "collection_id", collection.ID, "folder", req.Folder, "hash_count", len(hashes), "error", err)
+		_ = s.collections.Delete(collection.ID)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	collection.VideoHashes = hashes
+	collection.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(collection)
 }
 
 // Handler for
