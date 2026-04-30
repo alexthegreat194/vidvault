@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -244,11 +243,10 @@ func (s *server) handleVideosStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	videos, err := scanVideos(s.root, s.videoCache)
+	videos, err := scanVideosWithCallback(s.root, s.videoCache, func(v Video) error {
+		return writeEvent("video", v)
+	})
 	if err != nil {
-		if errors.Is(err, context.Canceled) {
-			return
-		}
 		serverLog.Error("failed streaming videos scan", "error", err)
 		writeEvent("scan_error", map[string]any{"message": err.Error()})
 		return
@@ -657,6 +655,25 @@ func (s *server) handleCreateCollectionFromFolder(w http.ResponseWriter, r *http
 	_ = json.NewEncoder(w).Encode(collection)
 }
 
+// statusRecordingWriter records the HTTP status passed to WriteHeader for logging.
+type statusRecordingWriter struct {
+	http.ResponseWriter
+	code int
+}
+
+func (s *statusRecordingWriter) WriteHeader(code int) {
+	s.code = code
+	s.ResponseWriter.WriteHeader(code)
+}
+
+func (s *statusRecordingWriter) Unwrap() http.ResponseWriter { return s.ResponseWriter }
+
+func (s *statusRecordingWriter) Flush() {
+	if f, ok := s.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
 // Handler for
 func (s *server) handleVideo(w http.ResponseWriter, r *http.Request) {
 	serverLog.Debug("video request received", "query", r.URL.RawQuery)
@@ -703,7 +720,11 @@ func (s *server) handleVideo(w http.ResponseWriter, r *http.Request) {
 	// Serve with range support (needed for video scrubbing)
 	fi, _ := f.Stat()
 	serverLog.Debug("serving video file", "path", relPath, "resolved", fileAbs, "size", fi.Size(), "mime", mimeType)
-	http.ServeContent(w, r, filepath.Base(fileAbs), fi.ModTime(), f)
+	rw := &statusRecordingWriter{ResponseWriter: w}
+	http.ServeContent(rw, r, filepath.Base(fileAbs), fi.ModTime(), f)
+	if rw.code == http.StatusRequestedRangeNotSatisfiable {
+		serverLog.Warn("video range not satisfiable", "path", relPath, "range", r.Header.Get("Range"), "size", fi.Size())
+	}
 }
 
 // Http Handler for reading all the directories in a root directory

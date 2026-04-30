@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -99,19 +100,48 @@ func (*customLogWriter) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
+// levelFilterHandler gates DEBUG records on [debugMode]. Package-level loggers are
+// constructed during init (before [configureLogging] runs), so the handler must not
+// bake in a static min level.
+type levelFilterHandler struct {
+	inner slog.Handler
+}
+
+func (h *levelFilterHandler) Enabled(ctx context.Context, level slog.Level) bool {
+	if level >= slog.LevelInfo {
+		return h.inner.Enabled(ctx, level)
+	}
+	return debugMode.Load() && h.inner.Enabled(ctx, level)
+}
+
+func (h *levelFilterHandler) Handle(ctx context.Context, r slog.Record) error {
+	if !h.Enabled(ctx, r.Level) {
+		return nil
+	}
+	return h.inner.Handle(ctx, r)
+}
+
+func (h *levelFilterHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return &levelFilterHandler{inner: h.inner.WithAttrs(attrs)}
+}
+
+func (h *levelFilterHandler) WithGroup(name string) slog.Handler {
+	return &levelFilterHandler{inner: h.inner.WithGroup(name)}
+}
+
 func configureLogging(debug bool) {
 	debugMode.Store(debug)
+	if debug {
+		slog.SetLogLoggerLevel(slog.LevelDebug)
+	} else {
+		slog.SetLogLoggerLevel(slog.LevelInfo)
+	}
 }
 
 func fileLogger(name string) *slog.Logger {
-	level := slog.LevelInfo
-	if debugMode.Load() {
-		level = slog.LevelDebug
-	}
-	handler := slog.NewJSONHandler(&customLogWriter{}, &slog.HandlerOptions{
-		Level: level,
+	inner := slog.NewJSONHandler(&customLogWriter{}, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
 	})
-	logger := slog.New(handler)
-	slog.SetLogLoggerLevel(level)
+	logger := slog.New(&levelFilterHandler{inner: inner})
 	return logger.With("component", name)
 }
