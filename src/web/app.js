@@ -425,14 +425,139 @@ function upsertDownloadedVideo(video) {
 	rebuildAllVideos();
 }
 
-function refreshDerivedUI(mayAutoOpenDuplicates) {
+function refreshSidebarsOnly() {
 	computeDuplicateGroups();
 	buildIncomingNav();
 	buildTagNav();
 	buildFolderNav();
 	buildCollectionNav();
+}
+
+function refreshDerivedUI(mayAutoOpenDuplicates) {
+	refreshSidebarsOnly();
 	render();
 	updateDuplicateBanner(Boolean(mayAutoOpenDuplicates));
+	updateIncomingBanner();
+	populateUploadFolders();
+}
+
+function recomputeFiltered() {
+	const q = searchEl.value.toLowerCase(),
+		sort = sortSel.value;
+	filtered = ALL_VIDEOS.filter((v) => {
+		const inF =
+			activeFolder === "__all__" || (v.folder || "/") == activeFolder;
+		const inFav = !showFavoritesOnly || Boolean(v.is_favorite);
+		const inT =
+			activeTagFilters.size === 0 ||
+			[...activeTagFilters].every((tagID) =>
+				(v.tags || []).includes(tagID),
+			);
+		const inS =
+			!q ||
+			v.name.toLowerCase().includes(q) ||
+			(v.folder || "").toLowerCase().includes(q);
+		const inIncoming = !activeIncomingFilter || Boolean(v.is_new);
+		return inF && inFav && inT && inS && inIncoming;
+	});
+	filtered.sort((a, b) => {
+		if (sort === "name") return a.name.localeCompare(b.name);
+		if (sort === "name-desc") return b.name.localeCompare(a.name);
+		if (sort === "folder")
+			return (
+				(a.folder || "").localeCompare(b.folder || "") ||
+				a.name.localeCompare(b.name)
+			);
+		if (sort === "ext")
+			return a.ext.localeCompare(b.ext) || a.name.localeCompare(b.name);
+		if (sort === "modified")
+			return (
+				new Date(a.modified || 0).getTime() -
+					new Date(b.modified || 0).getTime() ||
+				a.name.localeCompare(b.name)
+			);
+		if (sort === "modified-desc")
+			return (
+				new Date(b.modified || 0).getTime() -
+					new Date(a.modified || 0).getTime() ||
+				a.name.localeCompare(b.name)
+			);
+		if (sort === "size")
+			return (
+				Number(a.size || 0) - Number(b.size || 0) ||
+				a.name.localeCompare(b.name)
+			);
+		if (sort === "size-desc")
+			return (
+				Number(b.size || 0) - Number(a.size || 0) ||
+				a.name.localeCompare(b.name)
+			);
+		return 0;
+	});
+}
+
+function updateGalleryStatsMarkup() {
+	const filteredCountMarkup =
+		"<b>" + filtered.length + "</b> / " + ALL_VIDEOS.length + " videos";
+	if (isVideoDiscoveryLoading) {
+		statsEl.innerHTML =
+			'<div class="stats-loading">' +
+			'<span class="stats-loading-label">' +
+			filteredCountMarkup +
+			" · scanning library (" +
+			ALL_VIDEOS.length +
+			' found)</span><span class="stats-loading-bar" aria-hidden="true"><span class="stats-loading-fill"></span></span></div>';
+	} else {
+		statsEl.innerHTML = filteredCountMarkup;
+	}
+}
+
+function patchGalleryTagBadgesForHashes(hashes) {
+	const hashSet = new Set((hashes || []).filter(Boolean));
+	if (!hashSet.size) return;
+	const escapePath =
+		typeof CSS !== "undefined" && typeof CSS.escape === "function"
+			? (p) => CSS.escape(p)
+			: (p) =>
+					String(p).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+	for (const video of ALL_VIDEOS) {
+		if (!video || !video.path || !video.hash || !hashSet.has(video.hash))
+			continue;
+		const card = gallery.querySelector(
+			'.card[data-path="' + escapePath(video.path) + '"]',
+		);
+		if (!card) continue;
+		const badges = card.querySelector(".card-badges");
+		if (!badges) continue;
+		const inner = renderVideoTagChipsInner(video.tags || []);
+		let tagSpan = badges.querySelector(".card-tags.card-tags--badges");
+		if (inner) {
+			if (!tagSpan) {
+				tagSpan = document.createElement("span");
+				tagSpan.className = "card-tags card-tags--badges";
+				badges.appendChild(tagSpan);
+			}
+			tagSpan.innerHTML = inner;
+		} else if (tagSpan) {
+			tagSpan.remove();
+		}
+	}
+}
+
+function refreshAfterTagDataChange(prevFilteredPaths, affectedHashes) {
+	refreshSidebarsOnly();
+	recomputeFiltered();
+	const nextPaths = filtered.map((v) => v.path);
+	const unchanged =
+		prevFilteredPaths.length === nextPaths.length &&
+		prevFilteredPaths.every((p, i) => p === nextPaths[i]);
+	if (unchanged) {
+		updateGalleryStatsMarkup();
+		patchGalleryTagBadgesForHashes(affectedHashes);
+	} else {
+		render();
+	}
+	updateDuplicateBanner(false);
 	updateIncomingBanner();
 	populateUploadFolders();
 }
@@ -651,6 +776,11 @@ async function refresh() {
 async function refreshTagsOnly() {
 	const tr = await fetch("/api/tags");
 	parseTags(await tr.json());
+}
+
+async function refreshCollectionsOnly() {
+	const cr = await fetch("/api/collections");
+	parseCollections(await cr.json());
 }
 
 async function refreshTagAssignmentsForHashes(hashes) {
@@ -928,6 +1058,8 @@ function buildTagNav() {
 				}
 				activeTagFilters.delete(tag.id);
 				try {
+					recomputeFiltered();
+					const prevFilteredPaths = filtered.map((v) => v.path);
 					const affectedHashes = [
 						...new Set(
 							ALL_VIDEOS.filter((v) =>
@@ -939,7 +1071,7 @@ function buildTagNav() {
 					];
 					await refreshTagsOnly();
 					await refreshTagAssignmentsForHashes(affectedHashes);
-					refreshDerivedUI(false);
+					refreshAfterTagDataChange(prevFilteredPaths, affectedHashes);
 				} catch (e) {
 					await refresh();
 				}
@@ -1132,71 +1264,8 @@ function buildCollectionNav() {
 }
 
 function render() {
-	const q = searchEl.value.toLowerCase(),
-		sort = sortSel.value;
-	filtered = ALL_VIDEOS.filter((v) => {
-		const inF =
-			activeFolder === "__all__" || (v.folder || "/") == activeFolder;
-		const inFav = !showFavoritesOnly || Boolean(v.is_favorite);
-		const inT =
-			activeTagFilters.size === 0 ||
-			[...activeTagFilters].every((tagID) =>
-				(v.tags || []).includes(tagID),
-			);
-		const inS =
-			!q ||
-			v.name.toLowerCase().includes(q) ||
-			(v.folder || "").toLowerCase().includes(q);
-		const inIncoming = !activeIncomingFilter || Boolean(v.is_new);
-		return inF && inFav && inT && inS && inIncoming;
-	});
-	filtered.sort((a, b) => {
-		if (sort === "name") return a.name.localeCompare(b.name);
-		if (sort === "name-desc") return b.name.localeCompare(a.name);
-		if (sort === "folder")
-			return (
-				(a.folder || "").localeCompare(b.folder || "") ||
-				a.name.localeCompare(b.name)
-			);
-		if (sort === "ext")
-			return a.ext.localeCompare(b.ext) || a.name.localeCompare(b.name);
-		if (sort === "modified")
-			return (
-				new Date(a.modified || 0).getTime() -
-					new Date(b.modified || 0).getTime() ||
-				a.name.localeCompare(b.name)
-			);
-		if (sort === "modified-desc")
-			return (
-				new Date(b.modified || 0).getTime() -
-					new Date(a.modified || 0).getTime() ||
-				a.name.localeCompare(b.name)
-			);
-		if (sort === "size")
-			return (
-				Number(a.size || 0) - Number(b.size || 0) ||
-				a.name.localeCompare(b.name)
-			);
-		if (sort === "size-desc")
-			return (
-				Number(b.size || 0) - Number(a.size || 0) ||
-				a.name.localeCompare(b.name)
-			);
-		return 0;
-	});
-	const filteredCountMarkup =
-		"<b>" + filtered.length + "</b> / " + ALL_VIDEOS.length + " videos";
-	if (isVideoDiscoveryLoading) {
-		statsEl.innerHTML =
-			'<div class="stats-loading">' +
-			'<span class="stats-loading-label">' +
-			filteredCountMarkup +
-			" · scanning library (" +
-			ALL_VIDEOS.length +
-			' found)</span><span class="stats-loading-bar" aria-hidden="true"><span class="stats-loading-fill"></span></span></div>';
-	} else {
-		statsEl.innerHTML = filteredCountMarkup;
-	}
+	recomputeFiltered();
+	updateGalleryStatsMarkup();
 	gallery.innerHTML = "";
 	if (!filtered.length) {
 		if (isVideoDiscoveryLoading && ALL_VIDEOS.length === 0) {
@@ -1661,6 +1730,8 @@ function renderTagOptions() {
 				}
 				activeTagFilters.delete(tag.id);
 				try {
+					recomputeFiltered();
+					const prevFilteredPaths = filtered.map((v) => v.path);
 					const affectedHashes = [
 						...new Set(
 							ALL_VIDEOS.filter((v) =>
@@ -1672,7 +1743,7 @@ function renderTagOptions() {
 					];
 					await refreshTagsOnly();
 					await refreshTagAssignmentsForHashes(affectedHashes);
-					refreshDerivedUI(false);
+					refreshAfterTagDataChange(prevFilteredPaths, affectedHashes);
 				} catch (e) {
 					await refresh();
 				}
@@ -1696,7 +1767,7 @@ tagNewBtn.addEventListener("click", async () => {
 	tagNewInput.value = "";
 	try {
 		await refreshTagsOnly();
-		refreshDerivedUI(false);
+		buildTagNav();
 	} catch (e) {
 		await refresh();
 	}
@@ -1730,6 +1801,9 @@ tagApplyBtn.addEventListener("click", async () => {
 		confirmLines.push("Remove: " + removingNames.join(", "));
 	if (!confirm(confirmLines.join("\n"))) return;
 
+	recomputeFiltered();
+	const prevFilteredPaths = filtered.map((v) => v.path);
+
 	let failures = 0;
 	for (const [tagID, action] of entries) {
 		const ok = await setTagAssignmentsBulk(hashes, tagID, action === "add");
@@ -1745,7 +1819,7 @@ tagApplyBtn.addEventListener("click", async () => {
 	try {
 		await refreshTagsOnly();
 		await refreshTagAssignmentsForHashes(hashes);
-		refreshDerivedUI(false);
+		refreshAfterTagDataChange(prevFilteredPaths, hashes);
 	} catch (e) {
 		await refresh();
 	}
@@ -2487,7 +2561,7 @@ async function createSidebarTag() {
 	toast("Created tag " + name, "success");
 	try {
 		await refreshTagsOnly();
-		refreshDerivedUI(false);
+		buildTagNav();
 	} catch (e) {
 		await refresh();
 	}
@@ -2520,7 +2594,12 @@ async function createSidebarCollection() {
 	}
 	hideSidebarCollectionForm();
 	toast("Created collection " + name, "success");
-	await refresh();
+	try {
+		await refreshCollectionsOnly();
+		buildCollectionNav();
+	} catch (e) {
+		await refresh();
+	}
 }
 sidebarCollectionConfirm.addEventListener("click", createSidebarCollection);
 sidebarCollectionInput.addEventListener("keydown", (e) => {
@@ -2945,7 +3024,12 @@ collectionPickerNewBtn.addEventListener("click", async () => {
 		return;
 	}
 	collectionPickerNewInput.value = "";
-	await refresh();
+	try {
+		await refreshCollectionsOnly();
+		buildCollectionNav();
+	} catch (e) {
+		await refresh();
+	}
 	collectionPickerSelectedID = created.id;
 	renderCollectionPickerOptions();
 });
@@ -2955,15 +3039,22 @@ collectionPickerNewInput.addEventListener("keydown", (e) => {
 collectionPickerConfirmBtn.addEventListener("click", async () => {
 	if (!collectionPickerSelectedID || !collectionPickerTargetHashes.length)
 		return;
+	const collectionId = collectionPickerSelectedID;
 	const ok = await bulkAddCollectionVideos(
-		collectionPickerSelectedID,
+		collectionId,
 		collectionPickerTargetHashes,
 	);
 	if (!ok) {
 		toast("Add to collection failed", "error");
 		return;
 	}
-	await refresh();
+	try {
+		await refreshCollectionsOnly();
+		buildCollectionNav();
+		if (activeCollectionID === collectionId) openWatchCollection(collectionId);
+	} catch (e) {
+		await refresh();
+	}
 	closeCollectionPicker();
 	if (selectMode) exitSelectMode();
 	toast("Added to collection", "success");
