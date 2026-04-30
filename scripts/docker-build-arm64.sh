@@ -7,7 +7,7 @@ cd "$ROOT"
 
 IMAGE="${IMAGE:-alexthegreat1941/vidvault:arm64}"
 PLATFORM="${PLATFORM:-linux/arm64}"
-PUSH="${PUSH:-0}"
+PUSH="${PUSH:-1}"
 LOAD="${LOAD:-1}"
 PROVENANCE="${PROVENANCE:-false}"
 

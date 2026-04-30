@@ -11,9 +11,9 @@ Bugs:
 - [x] adding/updating tags currently triggers a full video refetch; switch to a tag-specific API flow that fetches only videos needing tag updates
 - [x] after any select-mode operation completes, automatically disable/exit select mode
 - [ ] has trouble with multiple hashes
-- [ ] 416 Requested Range Not Satisfiable
+- [x] 416 Requested Range Not Satisfiable
 - [x] disable password managers
-- [ ] duplicate manager opens on a new page; the overlap still happens; duplication manager identified 30 files as being empty, they are recognized as the same file
+- [x] duplicate manager opens on a new page; the overlap still happens; duplication manager identified 30 files as being empty, they are recognized as the same file
 
 Tweaks:
 - [x] add all files to top of list
