@@ -6,11 +6,12 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"vidvault/src/logging"
 )
 
 const favoritesFileName = "favorites.json"
 
-var favoritesLog = fileLogger("favorites")
+var favoritesLog = logging.FileLogger("favorites")
 
 // FavoritesStore persists favorite state keyed by video hash.
 type FavoritesStore struct {

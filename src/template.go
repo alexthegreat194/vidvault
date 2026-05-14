@@ -3,9 +3,10 @@ package main
 import (
 	"embed"
 	"strings"
+	"vidvault/src/logging"
 )
 
-var templateLog = fileLogger("template")
+var templateLog = logging.FileLogger("template")
 
 //go:embed web/*
 var webFS embed.FS

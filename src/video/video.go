@@ -1,4 +1,4 @@
-package main
+package video
 
 import (
 	"crypto/sha256"
@@ -12,9 +12,10 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"vidvault/src/logging"
 )
 
-var videoLog = fileLogger("video")
+var videoLog = logging.FileLogger("video")
 
 // videoExts is the set of file extensions (lowercase, dot-prefixed) recognized
 // as video files. Referenced by scanVideos, handleFolders, and uploadOne.
@@ -44,18 +45,25 @@ type Video struct {
 	Tags     []string  `json:"tags,omitempty"` // list of tag IDs applied to this video hash
 }
 
-var (
-	errEmptyVideoPath       = errors.New("missing path")
-	errForbiddenPath        = errors.New("forbidden")
-	errVideoNotFound        = errors.New("video not found")
-	errNotAFile             = errors.New("path is not a file")
-	errRenameEmptyName      = errors.New("empty name")
-	errRenameInvalidName    = errors.New("invalid name")
-	errRenameExists         = errors.New("destination exists")
-	errRenameUnsupportedExt = errors.New("unsupported extension")
-)
+var Errors = struct {
+	EmptyVideoPath    error
+	ForbiddenPath     error
+	VideoNotFound     error
+	NotAFile          error
+	RenameEmptyName   error
+	RenameInvalidName error
+	RenameExists      error
+}{
+	EmptyVideoPath:    errors.New("missing path"),
+	ForbiddenPath:     errors.New("forbidden"),
+	VideoNotFound:     errors.New("video not found"),
+	NotAFile:          errors.New("path is not a file"),
+	RenameEmptyName:   errors.New("empty name"),
+	RenameInvalidName: errors.New("invalid name"),
+	RenameExists:      errors.New("destination exists"),
+}
 
-func isValidVideoExtention(ext string) bool {
+func IsValidVideoExtention(ext string) bool {
 	return !videoExts[ext] == false
 }
 
@@ -77,23 +85,23 @@ func hashFile(path string) (string, error) {
 	return sum, nil
 }
 
-type videoCacheEntry struct {
+type VideoCacheEntry struct {
 	cacheKey string
 	video    Video
 }
 
-type videoScanCache struct {
+type VideoScanCache struct {
 	mu      sync.RWMutex
-	entries map[string]videoCacheEntry
+	entries map[string]VideoCacheEntry
 }
 
-func newVideoScanCache() *videoScanCache {
-	return &videoScanCache{
-		entries: map[string]videoCacheEntry{},
+func NewVideoScanCache() *VideoScanCache {
+	return &VideoScanCache{
+		entries: map[string]VideoCacheEntry{},
 	}
 }
 
-func makeVideoCacheKey(info os.FileInfo) string {
+func MakeVideoCacheKey(info os.FileInfo) string {
 	return strings.Join(
 		[]string{
 			strconv.FormatInt(info.Size(), 10),
@@ -103,7 +111,7 @@ func makeVideoCacheKey(info os.FileInfo) string {
 	)
 }
 
-func (c *videoScanCache) getVideo(relPath string, cacheKey string) (Video, bool) {
+func (c *VideoScanCache) getVideo(relPath string, cacheKey string) (Video, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	entry, ok := c.entries[relPath]
@@ -113,16 +121,16 @@ func (c *videoScanCache) getVideo(relPath string, cacheKey string) (Video, bool)
 	return entry.video, true
 }
 
-func (c *videoScanCache) setVideo(relPath string, cacheKey string, video Video) {
+func (c *VideoScanCache) setVideo(relPath string, cacheKey string, video Video) {
 	c.mu.Lock()
-	c.entries[relPath] = videoCacheEntry{
+	c.entries[relPath] = VideoCacheEntry{
 		cacheKey: cacheKey,
 		video:    video,
 	}
 	c.mu.Unlock()
 }
 
-func (c *videoScanCache) prune(active map[string]struct{}) {
+func (c *VideoScanCache) prune(active map[string]struct{}) {
 	c.mu.Lock()
 	for relPath := range c.entries {
 		if _, ok := active[relPath]; !ok {
@@ -132,7 +140,7 @@ func (c *videoScanCache) prune(active map[string]struct{}) {
 	c.mu.Unlock()
 }
 
-func (c *videoScanCache) size() int {
+func (c *VideoScanCache) size() int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return len(c.entries)
@@ -172,7 +180,7 @@ func buildVideo(root string, relPath string, ext string, info os.FileInfo) (Vide
 	}, nil
 }
 
-func scanVideosWithCallback(root string, cache *videoScanCache, onVideo func(Video) error) ([]Video, error) {
+func ScanVideosWithCallback(root string, cache *VideoScanCache, onVideo func(Video) error) ([]Video, error) {
 	videoLog.Debug("starting video scan", "root", root)
 	var videos []Video
 	activePaths := map[string]struct{}{}
@@ -193,7 +201,7 @@ func scanVideosWithCallback(root string, cache *videoScanCache, onVideo func(Vid
 		if err != nil {
 			return err
 		}
-		cacheKey := makeVideoCacheKey(info)
+		cacheKey := MakeVideoCacheKey(info)
 		activePaths[rel] = struct{}{}
 
 		var video Video
@@ -241,18 +249,18 @@ func scanVideosWithCallback(root string, cache *videoScanCache, onVideo func(Vid
 
 // Walks root recursively and returns all video files found, sorted
 // by their relative path. Files with extensions not in videoExts are skipped.
-func scanVideos(root string, cache *videoScanCache) ([]Video, error) {
-	return scanVideosWithCallback(root, cache, nil)
+func ScanVideos(root string, cache *VideoScanCache) ([]Video, error) {
+	return ScanVideosWithCallback(root, cache, nil)
 }
 
-func deleteVideoByPath(root string, relPath string) error {
+func DeleteVideoByPath(root string, relPath string) error {
 	videoLog.Debug("delete requested", "root", root, "path", relPath)
 	if strings.TrimSpace(relPath) == "" {
-		return errEmptyVideoPath
+		return Errors.EmptyVideoPath
 	}
 	clean := filepath.Clean(filepath.FromSlash(relPath))
 	if clean == "." || strings.HasPrefix(clean, "..") {
-		return errForbiddenPath
+		return Errors.ForbiddenPath
 	}
 
 	rootAbs, _ := filepath.Abs(root)
@@ -261,23 +269,23 @@ func deleteVideoByPath(root string, relPath string) error {
 		return err
 	}
 	if !strings.HasPrefix(fileAbs, rootAbs+string(os.PathSeparator)) {
-		return errForbiddenPath
+		return Errors.ForbiddenPath
 	}
 
 	info, err := os.Stat(fileAbs)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return errVideoNotFound
+			return Errors.VideoNotFound
 		}
 		return err
 	}
 	if info.IsDir() {
-		return errNotAFile
+		return Errors.NotAFile
 	}
 
 	if err := os.Remove(fileAbs); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return errVideoNotFound
+			return Errors.VideoNotFound
 		}
 		return err
 	}
@@ -289,14 +297,14 @@ func deleteVideoByPath(root string, relPath string) error {
 // newName must be a single path segment (no slashes). If it has no extension,
 // the source file's extension is preserved. If it has an extension, it must be
 // a supported video extension. Returns the new slash-separated path relative to root.
-func renameVideoFile(root string, relPath string, newName string) (string, error) {
+func RenameVideoFile(root string, relPath string, newName string) (string, error) {
 	videoLog.Debug("rename requested", "root", root, "path", relPath, "newName", newName)
 	if strings.TrimSpace(relPath) == "" {
-		return "", errEmptyVideoPath
+		return "", Errors.EmptyVideoPath
 	}
 	clean := filepath.Clean(filepath.FromSlash(relPath))
 	if clean == "." || strings.HasPrefix(clean, "..") {
-		return "", errForbiddenPath
+		return "", Errors.ForbiddenPath
 	}
 
 	rootAbs, err := filepath.Abs(root)
@@ -308,41 +316,41 @@ func renameVideoFile(root string, relPath string, newName string) (string, error
 		return "", err
 	}
 	if !strings.HasPrefix(srcAbs, rootAbs+string(os.PathSeparator)) {
-		return "", errForbiddenPath
+		return "", Errors.ForbiddenPath
 	}
 
 	info, err := os.Stat(srcAbs)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return "", errVideoNotFound
+			return "", Errors.VideoNotFound
 		}
 		return "", err
 	}
 	if info.IsDir() {
-		return "", errNotAFile
+		return "", Errors.NotAFile
 	}
 
 	origExt := strings.ToLower(filepath.Ext(srcAbs))
 	if !videoExts[origExt] {
-		return "", errNotAFile
+		return "", Errors.NotAFile
 	}
 
 	newName = strings.TrimSpace(newName)
 	if newName == "" {
-		return "", errRenameEmptyName
+		return "", Errors.RenameEmptyName
 	}
 	if strings.ContainsAny(newName, `/\`) || strings.Contains(newName, "..") {
-		return "", errRenameInvalidName
+		return "", Errors.RenameInvalidName
 	}
 	if filepath.Base(newName) != newName {
-		return "", errRenameInvalidName
+		return "", Errors.RenameInvalidName
 	}
 
 	destBase := newName
 	if ext := strings.ToLower(filepath.Ext(destBase)); ext == "" {
 		destBase = destBase + origExt
 	} else if !videoExts[ext] {
-		return "", errRenameUnsupportedExt
+		return "", Errors.NotAFile
 	}
 
 	destAbs := filepath.Join(filepath.Dir(srcAbs), destBase)
@@ -351,7 +359,7 @@ func renameVideoFile(root string, relPath string, newName string) (string, error
 		return "", err
 	}
 	if filepath.Clean(filepath.Dir(srcAbs)) != filepath.Clean(filepath.Dir(destAbs)) {
-		return "", errForbiddenPath
+		return "", Errors.ForbiddenPath
 	}
 
 	if filepath.Clean(srcAbs) == filepath.Clean(destAbs) {
@@ -363,13 +371,13 @@ func renameVideoFile(root string, relPath string, newName string) (string, error
 	}
 
 	if _, err := os.Stat(destAbs); err == nil {
-		return "", errRenameExists
+		return "", Errors.RenameExists
 	} else if !errors.Is(err, os.ErrNotExist) {
-		return "", err
+		return "", Errors.RenameExists
 	}
 
 	if err := os.Rename(srcAbs, destAbs); err != nil {
-		return "", err
+		return "", Errors.RenameExists
 	}
 	relOut, err := filepath.Rel(rootAbs, destAbs)
 	if err != nil {

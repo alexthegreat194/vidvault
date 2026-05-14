@@ -12,9 +12,10 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"vidvault/src/logging"
 )
 
-var mainLog = fileLogger("main")
+var mainLog = logging.FileLogger("main")
 
 func main() {
 	port := flag.Int("p", 8765, "port to listen on")
@@ -23,7 +24,7 @@ func main() {
 	pin := flag.String("pin", "", "optional PIN; when set, web UI and APIs require unlock until entered")
 	flag.Parse()
 
-	configureLogging(*debug)
+	logging.ConfigureLogging(*debug)
 	mainLog.Debug("debug mode enabled")
 
 	dir := "."

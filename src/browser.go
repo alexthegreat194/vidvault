@@ -4,9 +4,10 @@ import (
 	"net"
 	"os/exec"
 	"runtime"
+	"vidvault/src/logging"
 )
 
-var browserLog = fileLogger("browser")
+var browserLog = logging.FileLogger("browser")
 
 // ── open browser ──────────────────────────────────────────────────────────────
 

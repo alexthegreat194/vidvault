@@ -6,9 +6,11 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"vidvault/src/logging"
+	"vidvault/src/video"
 )
 
-var foldersLog = fileLogger("folders")
+var foldersLog = logging.FileLogger("folders")
 
 // folderInfo describes a subdirectory under the media root.
 // It is serialised to JSON and returned by the /api/folders endpoint.
@@ -43,7 +45,7 @@ func getFolderMetadata(root string) ([]folderInfo, error) {
 			parent := filepath.ToSlash(filepath.Dir(rel))
 			inSubDir := parent != "."
 
-			if !isValidVideoExtention(ext) && inSubDir {
+			if !video.IsValidVideoExtention(ext) && inSubDir {
 				parentDirDetails := seen[parent]
 				if parentDirDetails != nil {
 					parentDirDetails.HasOtherFiles = true

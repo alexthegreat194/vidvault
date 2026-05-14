@@ -12,11 +12,12 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"vidvault/src/logging"
 )
 
 const collectionsFileName = "watch_collections.json"
 
-var collectionsLog = fileLogger("collections")
+var collectionsLog = logging.FileLogger("collections")
 
 type WatchCollection struct {
 	ID          string   `json:"id"`

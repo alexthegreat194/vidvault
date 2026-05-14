@@ -1,4 +1,4 @@
-package main
+package logging
 
 import (
 	"context"
@@ -101,7 +101,7 @@ func (*customLogWriter) Write(p []byte) (n int, err error) {
 }
 
 // levelFilterHandler gates DEBUG records on [debugMode]. Package-level loggers are
-// constructed during init (before [configureLogging] runs), so the handler must not
+// constructed during init (before [ConfigureLogging] runs), so the handler must not
 // bake in a static min level.
 type levelFilterHandler struct {
 	inner slog.Handler
@@ -129,7 +129,7 @@ func (h *levelFilterHandler) WithGroup(name string) slog.Handler {
 	return &levelFilterHandler{inner: h.inner.WithGroup(name)}
 }
 
-func configureLogging(debug bool) {
+func ConfigureLogging(debug bool) {
 	debugMode.Store(debug)
 	if debug {
 		slog.SetLogLoggerLevel(slog.LevelDebug)
@@ -138,7 +138,12 @@ func configureLogging(debug bool) {
 	}
 }
 
-func fileLogger(name string) *slog.Logger {
+// DebugEnabled reports whether debug mode is on (verbose handlers, extra log fields).
+func DebugEnabled() bool {
+	return debugMode.Load()
+}
+
+func FileLogger(name string) *slog.Logger {
 	inner := slog.NewJSONHandler(&customLogWriter{}, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
 	})

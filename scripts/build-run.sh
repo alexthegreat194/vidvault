@@ -7,5 +7,5 @@ exec ./vidvault \
     -p 5001 \
     -disable-browser \
     -d \
-    -pin 1234 \
+    # -pin 1234 \
     ./data

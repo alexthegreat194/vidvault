@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"vidvault/src/video"
 )
 
 const seenFilesFileName = "seen_files.json"
@@ -88,7 +89,7 @@ func normalizeRootKey(root string) string {
 	return filepath.ToSlash(filepath.Clean(abs))
 }
 
-func (s *SeenFilesStore) keyForVideo(v Video) string {
+func (s *SeenFilesStore) keyForVideo(v video.Video) string {
 	if hash := strings.TrimSpace(v.Hash); hash != "" {
 		return "hash:" + hash
 	}
@@ -100,7 +101,7 @@ func (s *SeenFilesStore) keyForVideo(v Video) string {
 }
 
 // MarkVideos mutates each video's IsNew flag and persists seen-state changes.
-func (s *SeenFilesStore) MarkVideos(root string, videos []Video) error {
+func (s *SeenFilesStore) MarkVideos(root string, videos []video.Video) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -185,7 +186,7 @@ func (s *SeenFilesStore) MarkReviewedByKeys(keys []string) error {
 	return s.persistLocked()
 }
 
-func (s *SeenFilesStore) MarkReviewedForVideos(videos []Video, clearAll bool, paths []string, hashes []string) error {
+func (s *SeenFilesStore) MarkReviewedForVideos(videos []video.Video, clearAll bool, paths []string, hashes []string) error {
 	pathSet := map[string]struct{}{}
 	hashSet := map[string]struct{}{}
 	for _, path := range paths {
@@ -227,7 +228,7 @@ func (s *SeenFilesStore) MarkReviewedForVideos(videos []Video, clearAll bool, pa
 	return s.MarkReviewedByKeys(keys)
 }
 
-func (s *SeenFilesStore) ForgetForVideos(videos []Video, forgetAll bool, paths []string, hashes []string) error {
+func (s *SeenFilesStore) ForgetForVideos(videos []video.Video, forgetAll bool, paths []string, hashes []string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

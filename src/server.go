@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"vidvault/src/logging"
+	"vidvault/src/video"
 )
 
 // ── server ────────────────────────────────────────────────────────────────────
@@ -25,7 +27,7 @@ type server struct {
 	tags        *TagsStore
 	collections *WatchCollectionsStore
 	seenFiles   *SeenFilesStore
-	videoCache  *videoScanCache
+	videoCache  *video.VideoScanCache
 	mux         *http.ServeMux
 	pin         string
 	authSecret  []byte
@@ -33,7 +35,7 @@ type server struct {
 	authMu      sync.RWMutex
 }
 
-var serverLog = fileLogger("server")
+var serverLog = logging.FileLogger("server")
 
 // newServer constructs a server rooted at root and registers all API and
 // static routes on a fresh ServeMux.
@@ -62,7 +64,7 @@ func newServer(root, pin string) (*server, error) {
 		tags:        tags,
 		collections: collections,
 		seenFiles:   seenFiles,
-		videoCache:  newVideoScanCache(),
+		videoCache:  video.NewVideoScanCache(),
 		mux:         http.NewServeMux(),
 	}
 	if err := initPinAuth(s, pin); err != nil {
@@ -115,7 +117,7 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			"status", rw.status,
 			"duration_ms", time.Since(start).Milliseconds(),
 		}
-		if debugMode.Load() {
+		if logging.DebugEnabled() {
 			fields = append(fields, "bytes", rw.bytes, "remote", r.RemoteAddr, "user_agent", r.UserAgent())
 		}
 		serverLog.Info("request completed", fields...)
@@ -128,7 +130,7 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		"status", rw.status,
 		"duration_ms", time.Since(start).Milliseconds(),
 	}
-	if debugMode.Load() {
+	if logging.DebugEnabled() {
 		fields = append(fields, "bytes", rw.bytes, "remote", r.RemoteAddr, "user_agent", r.UserAgent())
 	}
 	serverLog.Info("request completed", fields...)
@@ -186,7 +188,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 // handleVideos HTTP handler for all video metadata
 func (s *server) handleVideos(w http.ResponseWriter, r *http.Request) {
 	serverLog.Debug("handling videos request")
-	videos, err := scanVideos(s.root, s.videoCache)
+	videos, err := video.ScanVideos(s.root, s.videoCache)
 	if err != nil {
 		serverLog.Error("failed to scan videos", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -206,7 +208,7 @@ func (s *server) handleVideos(w http.ResponseWriter, r *http.Request) {
 	serverLog.Debug("videos response sent", "count", len(videos))
 }
 
-func (s *server) applyVideoMetadata(video *Video) {
+func (s *server) applyVideoMetadata(video *video.Video) {
 	video.Favorite = s.favorites.IsFavorite(video.Hash)
 	video.Tags = s.tags.TagsForHash(video.Hash)
 }
@@ -243,7 +245,7 @@ func (s *server) handleVideosStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	videos, err := scanVideosWithCallback(s.root, s.videoCache, func(v Video) error {
+	videos, err := video.ScanVideosWithCallback(s.root, s.videoCache, func(v video.Video) error {
 		return writeEvent("video", v)
 	})
 	if err != nil {
@@ -285,7 +287,7 @@ func (s *server) handleClearNewVideos(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-	videos, err := scanVideos(s.root, s.videoCache)
+	videos, err := video.ScanVideos(s.root, s.videoCache)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -311,7 +313,7 @@ func (s *server) handleForgetVideos(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-	videos, err := scanVideos(s.root, s.videoCache)
+	videos, err := video.ScanVideos(s.root, s.videoCache)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -613,7 +615,7 @@ func (s *server) handleCreateCollectionFromFolder(w http.ResponseWriter, r *http
 		return
 	}
 
-	videos, err := scanVideos(s.root, s.videoCache)
+	videos, err := video.ScanVideos(s.root, s.videoCache)
 	if err != nil {
 		serverLog.Error("failed scanning videos for collection snapshot", "folder", req.Folder, "error", err)
 		http.Error(w, "failed scanning videos", http.StatusInternalServerError)
@@ -827,25 +829,25 @@ func (s *server) handleRename(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newPath, err := renameVideoFile(s.root, req.Path, req.Name)
+	newPath, err := video.RenameVideoFile(s.root, req.Path, req.Name)
 	if err != nil {
 		serverLog.Error("rename failed", "path", req.Path, "error", err)
 		switch {
-		case errors.Is(err, errEmptyVideoPath):
+		case errors.Is(err, video.Errors.EmptyVideoPath):
 			http.Error(w, err.Error(), http.StatusBadRequest)
-		case errors.Is(err, errForbiddenPath):
+		case errors.Is(err, video.Errors.ForbiddenPath):
 			http.Error(w, err.Error(), http.StatusForbidden)
-		case errors.Is(err, errVideoNotFound):
+		case errors.Is(err, video.Errors.VideoNotFound):
 			http.Error(w, err.Error(), http.StatusNotFound)
-		case errors.Is(err, errNotAFile):
+		case errors.Is(err, video.Errors.NotAFile):
 			http.Error(w, err.Error(), http.StatusBadRequest)
-		case errors.Is(err, errRenameEmptyName):
+		case errors.Is(err, video.Errors.RenameEmptyName):
 			http.Error(w, err.Error(), http.StatusBadRequest)
-		case errors.Is(err, errRenameInvalidName):
+		case errors.Is(err, video.Errors.RenameInvalidName):
 			http.Error(w, err.Error(), http.StatusBadRequest)
-		case errors.Is(err, errRenameExists):
+		case errors.Is(err, video.Errors.RenameExists):
 			http.Error(w, err.Error(), http.StatusConflict)
-		case errors.Is(err, errRenameUnsupportedExt):
+		case errors.Is(err, video.Errors.NotAFile):
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		default:
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -922,16 +924,16 @@ func (s *server) handleDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := deleteVideoByPath(s.root, req.Path); err != nil {
+	if err := video.DeleteVideoByPath(s.root, req.Path); err != nil {
 		serverLog.Error("delete video failed", "path", req.Path, "error", err)
 		switch {
-		case errors.Is(err, errEmptyVideoPath):
+		case errors.Is(err, video.Errors.EmptyVideoPath):
 			http.Error(w, err.Error(), http.StatusBadRequest)
-		case errors.Is(err, errForbiddenPath):
+		case errors.Is(err, video.Errors.ForbiddenPath):
 			http.Error(w, err.Error(), http.StatusForbidden)
-		case errors.Is(err, errVideoNotFound):
+		case errors.Is(err, video.Errors.VideoNotFound):
 			http.Error(w, err.Error(), http.StatusNotFound)
-		case errors.Is(err, errNotAFile):
+		case errors.Is(err, video.Errors.NotAFile):
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		default:
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -948,7 +950,7 @@ func (s *server) handleDelete(w http.ResponseWriter, r *http.Request) {
 func uploadOne(fh *multipart.FileHeader, destDir string) string {
 	name := filepath.Base(fh.Filename)
 	ext := strings.ToLower(filepath.Ext(name))
-	if !videoExts[ext] {
+	if !video.IsValidVideoExtention(ext) {
 		serverLog.Debug("upload rejected due to unsupported extension", "file", fh.Filename, "ext", ext)
 		return "unsupported type"
 	}

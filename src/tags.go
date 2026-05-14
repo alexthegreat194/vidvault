@@ -11,11 +11,12 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"vidvault/src/logging"
 )
 
 const tagsFileName = "tags.json"
 
-var tagsLog = fileLogger("tags")
+var tagsLog = logging.FileLogger("tags")
 
 type Tag struct {
 	ID    string `json:"id"`
