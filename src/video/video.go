@@ -69,6 +69,11 @@ func IsValidVideoExtention(ext string) bool {
 
 func hashFile(path string) (string, error) {
 	videoLog.Debug("hashing file", "path", path)
+	startTime := time.Now()
+	info, err := os.Stat(path)
+	if err != nil {
+		return "", err
+	}
 	f, err := os.Open(path)
 	if err != nil {
 		return "", err
@@ -82,25 +87,30 @@ func hashFile(path string) (string, error) {
 	}
 	sum := hex.EncodeToString(hash.Sum(nil))
 	videoLog.Debug("hashed file", "path", path, "hash", sum)
+	videoLog.Debug("hashing file took", "time", time.Since(startTime), "size", info.Size())
 	return sum, nil
 }
 
+// VideoCacheEntry is a cache entry for a video after a scan.
 type VideoCacheEntry struct {
 	cacheKey string
 	video    Video
 }
 
+// VideoScanCache is a cache for all videos after a scan.
 type VideoScanCache struct {
 	mu      sync.RWMutex
-	entries map[string]VideoCacheEntry
+	entries map[string]VideoCacheEntry // relPath -> VideoCacheEntry
 }
 
+// NewVideoScanCache creates a new VideoScanCache to be attached to a server.
 func NewVideoScanCache() *VideoScanCache {
 	return &VideoScanCache{
 		entries: map[string]VideoCacheEntry{},
 	}
 }
 
+// MakeVideoCacheKey creates a cache key for a video based on its size and modification time.
 func MakeVideoCacheKey(info os.FileInfo) string {
 	return strings.Join(
 		[]string{
@@ -111,9 +121,12 @@ func MakeVideoCacheKey(info os.FileInfo) string {
 	)
 }
 
+// getVideo returns the Video for the given relative path and cache key.
+// cacheKey is used to identify the video if it has changed since the last scan.
 func (c *VideoScanCache) getVideo(relPath string, cacheKey string) (Video, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
+
 	entry, ok := c.entries[relPath]
 	if !ok || entry.cacheKey != cacheKey {
 		return Video{}, false
@@ -121,6 +134,7 @@ func (c *VideoScanCache) getVideo(relPath string, cacheKey string) (Video, bool)
 	return entry.video, true
 }
 
+// setVideo sets the Video for the given relative path and cache key.
 func (c *VideoScanCache) setVideo(relPath string, cacheKey string, video Video) {
 	c.mu.Lock()
 	c.entries[relPath] = VideoCacheEntry{
@@ -159,6 +173,7 @@ func normalizeVideoFromRelPath(video Video, relPath string) Video {
 	return video
 }
 
+// buildVideo takes a root directory, a relative path, an extension, and a file info and returns an object conatining the video metadata (Video).
 func buildVideo(root string, relPath string, ext string, info os.FileInfo) (Video, error) {
 	absPath := filepath.Join(root, relPath)
 	hash, err := hashFile(absPath)

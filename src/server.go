@@ -103,6 +103,9 @@ func newServer(root, pin string) (*server, error) {
 	s.mux.HandleFunc("POST /api/videos/new/forget", s.handleForgetVideos)
 	s.mux.HandleFunc("/video", s.handleVideo)
 	serverLog.Info("routes registered", "root", root)
+
+	go video.ScanVideos(root, s.videoCache)
+
 	return s, nil
 }
 

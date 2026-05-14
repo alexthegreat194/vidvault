@@ -66,3 +66,13 @@ Analytics:
 
 2.0:
 - [ ] auto-tagging follow-up: learn from existing tag assignments and suggest/apply tags automatically for newly added videos
+
+
+
+looks like my algorythm is all wierd
+
+heres what i had in mind for video in app video/file metadata
+hash generated from file contents -> tags, collections, etc
+
+scan results in a cache formatted like this: 
+relative file/video position -> Hash info generated
