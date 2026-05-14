@@ -15,8 +15,8 @@ Bugs:
 - [x] disable password managers
 - [x] duplicate manager opens on a new page; the overlap still happens; duplication manager identified 30 files as being empty, they are recognized as the same file
 - [ ] disable color w a flag or on debug
-- [ ] if a card is moved to another folder, remove it from the current list instead of rerendering the entire list
-- [ ] when dragging a video, show a small drag preview icon so the full video does not take up the whole screen
+- [x] if a card is moved to another folder, remove it from the current list instead of rerendering the entire list
+- [x] when dragging a video, show a small drag preview icon so the full video does not take up the whole screen
 
 Tweaks:
 - [x] add all files to top of list

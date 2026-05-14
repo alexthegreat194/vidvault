@@ -179,6 +179,8 @@ let showFavoritesOnly = false;
 let pinGateMode = false;
 let pinGateUnlocked = false;
 let isVideoDiscoveryLoading = false;
+/** @type {HTMLDivElement | null} */
+let cardDragGhostEl = null;
 let tagTargetPaths = [];
 let pendingTagActions = new Map();
 let activeCollectionID = "";
@@ -1268,6 +1270,28 @@ function buildCollectionNav() {
 	}
 }
 
+const CARD_DRAG_GHOST_SIZE = 32;
+const CARD_DRAG_GHOST_OFFSET = CARD_DRAG_GHOST_SIZE / 2;
+
+/**
+ * Small transparent video icon used as the HTML5 drag image so the whole card
+ * (including video) is not shown while dragging.
+ * @returns {HTMLDivElement}
+ */
+function cardDragGhost() {
+	if (cardDragGhostEl) return cardDragGhostEl;
+	cardDragGhostEl = document.createElement("div");
+	cardDragGhostEl.className = "card-drag-ghost";
+	cardDragGhostEl.setAttribute("aria-hidden", "true");
+	cardDragGhostEl.innerHTML =
+		'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">' +
+		'<rect x="2.5" y="5" width="19" height="14" rx="2" stroke="rgba(255,255,255,.65)" stroke-width="1.5" fill="rgba(255,255,255,.08)"/>' +
+		'<polygon points="10,9.5 10,14.5 15,12" fill="rgba(255,255,255,.58)"/>' +
+		"</svg>";
+	document.body.appendChild(cardDragGhostEl);
+	return cardDragGhostEl;
+}
+
 function render() {
 	recomputeFiltered();
 	updateGalleryStatsMarkup();
@@ -1428,10 +1452,22 @@ function render() {
 			card.classList.add("dragging");
 			e.dataTransfer.setData("text/plain", v.path);
 			e.dataTransfer.effectAllowed = "move";
+			try {
+				e.dataTransfer.setDragImage(
+					cardDragGhost(),
+					CARD_DRAG_GHOST_OFFSET,
+					CARD_DRAG_GHOST_OFFSET,
+				);
+			} catch (_) {
+				/* setDragImage unsupported */
+			}
 		});
 		card.addEventListener("dragend", () =>
 			card.classList.remove("dragging"),
 		);
+		if (selectMode && selectedPaths.has(v.path)) {
+			card.classList.add("selected");
+		}
 		gallery.appendChild(card);
 	});
 	if (activeIncomingFilter && filtered.length) {
@@ -1944,9 +1980,134 @@ moveConfirmBtn.addEventListener("click", async () => {
 	if (selectMode) exitSelectMode();
 	closeMoveModal();
 });
+function movedVideoRelPath(srcPath, destFolder) {
+	const slash = srcPath.lastIndexOf("/");
+	const base = slash >= 0 ? srcPath.slice(slash + 1) : srcPath;
+	let dest = destFolder == null ? "" : String(destFolder).trim();
+	if (dest === "." || dest === "/") dest = "";
+	const rel = dest
+		? dest.replace(/^[/\\]+/, "").replace(/[/\\]+$/, "") + "/" + base
+		: base;
+	return rel.replace(/\\/g, "/");
+}
+
+function folderFromRelPath(relPath) {
+	const i = relPath.lastIndexOf("/");
+	if (i < 0) return "/";
+	const dir = relPath.slice(0, i);
+	return dir === "" ? "/" : dir.replace(/\\/g, "/");
+}
+
+function galleryCardSelectorForPath(p) {
+	const esc =
+		typeof CSS !== "undefined" && typeof CSS.escape === "function"
+			? CSS.escape(p)
+			: String(p).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+	return '.card[data-path="' + esc + '"]';
+}
+
+function removeGalleryCardByPath(path) {
+	const card = gallery.querySelector(galleryCardSelectorForPath(path));
+	if (card) card.remove();
+}
+
+function patchVideoCardDomAfterPathChange(card, v) {
+	card.dataset.path = v.path;
+	const folderSpans = card.querySelectorAll(".card-path");
+	if (folderSpans[0]) folderSpans[0].textContent = v.folder || "/";
+	const vid = card.querySelector("video");
+	if (vid) {
+		vid.classList.remove("loaded");
+		vid.src = "/video?path=" + encodeURIComponent(v.path) + "#t=2";
+		vid.addEventListener(
+			"loadeddata",
+			() => {
+				vid.classList.add("loaded");
+				applyHoverPreviewAudioToElement(vid);
+				if (card.dataset.hoverPreview === "1") {
+					seekAndStartHoverPreview(card, vid);
+				}
+			},
+			{ once: true },
+		);
+	}
+	if (
+		modal.classList.contains("open") &&
+		currentIdx >= 0 &&
+		filtered[currentIdx] === v
+	) {
+		modalPath.textContent = v.folder || "/";
+		modalVid.src = "/video?path=" + encodeURIComponent(v.path);
+	}
+}
+
 /**
- * Moves a single video file to destFolder via POST /api/move, then refreshes
- * the gallery. Shows a success or error toast on completion.
+ * Updates ALL_VIDEOS and the gallery DOM after a successful /api/move without
+ * refetching every video when the moved file is already known.
+ * @returns {boolean} false if the source path was not in ALL_VIDEOS (caller should full refresh).
+ */
+function applyVideoMoveLocally(srcPath, destFolder) {
+	const vi = ALL_VIDEOS.findIndex((v) => v && v.path === srcPath);
+	if (vi < 0) return false;
+	const v = ALL_VIDEOS[vi];
+	const newPath = movedVideoRelPath(srcPath, destFolder);
+	const newFolder = folderFromRelPath(newPath);
+	const viewingAll = activeFolder === "__all__";
+	const nk = newFolder || "/";
+	const leavesCurrentFolder = !viewingAll && nk != activeFolder;
+
+	if (
+		modal.classList.contains("open") &&
+		currentIdx >= 0 &&
+		filtered[currentIdx] &&
+		filtered[currentIdx].path === srcPath &&
+		leavesCurrentFolder
+	) {
+		closeModal();
+	}
+
+	if (selectedPaths.has(srcPath)) {
+		selectedPaths.delete(srcPath);
+		if (!leavesCurrentFolder) selectedPaths.add(newPath);
+	}
+
+	if (leavesCurrentFolder) {
+		ALL_VIDEOS.splice(vi, 1);
+		removeGalleryCardByPath(srcPath);
+		recomputeFiltered();
+		updateGalleryStatsMarkup();
+		if (selectMode) updateSelectBar();
+		return true;
+	}
+
+	const oldPath = v.path;
+	v.path = newPath;
+	v.folder = newFolder;
+	recomputeFiltered();
+
+	if (!filtered.includes(v)) {
+		removeGalleryCardByPath(oldPath);
+		updateGalleryStatsMarkup();
+		if (selectMode) updateSelectBar();
+		return true;
+	}
+
+	if (sortSel.value === "folder") {
+		render();
+		if (selectMode) updateSelectBar();
+		return true;
+	}
+
+	const card = gallery.querySelector(galleryCardSelectorForPath(oldPath));
+	if (card) patchVideoCardDomAfterPathChange(card, v);
+	updateGalleryStatsMarkup();
+	if (selectMode) updateSelectBar();
+	return true;
+}
+
+/**
+ * Moves a single video file to destFolder via POST /api/move, then updates
+ * the UI (incrementally when possible). Shows a success or error toast on completion.
  * @param {string} srcPath - Relative path of the file to move.
  * @param {string} destFolder - Destination folder name relative to root.
  */
@@ -1957,8 +2118,21 @@ async function moveVideo(srcPath, destFolder) {
 		body: JSON.stringify({ path: srcPath, dest_folder: destFolder }),
 	});
 	if (res.ok) {
+		const localOk = applyVideoMoveLocally(srcPath, destFolder);
+		if (!localOk) await refresh();
+		else {
+			try {
+				await refreshFoldersOnly();
+			} catch (_) {
+				/* folder list best-effort */
+			}
+			buildFolderNav();
+			populateUploadFolders();
+			computeDuplicateGroups();
+			updateDuplicateBanner(false);
+			updateIncomingBanner();
+		}
 		toast("Moved to " + destFolder, "success");
-		await refresh();
 	} else {
 		toast("Move failed: " + (await res.text()), "error");
 	}
