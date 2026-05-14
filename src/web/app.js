@@ -783,6 +783,11 @@ async function refreshCollectionsOnly() {
 	parseCollections(await cr.json());
 }
 
+async function refreshFoldersOnly() {
+	const fr = await fetch("/api/folders");
+	parseFolders(await fr.json());
+}
+
 async function refreshTagAssignmentsForHashes(hashes) {
 	const uniqueHashes = [...new Set((hashes || []).filter(Boolean))];
 	if (!uniqueHashes.length) return;
@@ -2630,8 +2635,8 @@ function hideSidebarFolderForm() {
 	sidebarFolderInput.value = "";
 }
 sidebarFolderCancel.addEventListener("click", hideSidebarFolderForm);
-/** Reads the sidebar folder input, POSTs to /api/mkdir, then refreshes the
- *  gallery and hides the form. Shows a toast on success or failure. */
+/** Reads the sidebar folder input, POSTs to /api/mkdir, then updates folder
+ *  nav (no full video rescan). Shows a toast on success or failure. */
 async function createFolder() {
 	const name = sidebarFolderInput.value.trim();
 	if (!name) return;
@@ -2643,7 +2648,14 @@ async function createFolder() {
 	if (res.ok) {
 		hideSidebarFolderForm();
 		toast("Created " + name, "success");
-		await refresh();
+		try {
+			await refreshFoldersOnly();
+			buildFolderNav();
+			populateUploadFolders();
+			if (moveModal.classList.contains("open")) renderFolderOptions();
+		} catch (e) {
+			await refresh();
+		}
 	} else {
 		toast("Failed: " + (await res.text()), "error");
 	}
