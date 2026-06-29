@@ -1,6 +1,6 @@
 # Vidvault
 
-Local **Go** HTTP server that turns a directory into a **video gallery**: it discovers supported video files, streams them with range requests (so seeking works in the browser), and serves a small web UI for browsing, organizing into folders, bulk selection/move, upload, and lightbox playback. The UI is embedded at compile time from `src/web/`.
+Local **Go** HTTP server that turns a directory into a **video gallery**: it discovers supported video files, streams them with range requests (so seeking works in the browser), and serves a small web UI for browsing, organizing into folders, bulk selection/move, upload, and lightbox playback. The UI is a **Svelte 5** app in [`frontend/`](frontend/), built to [`src/web/dist/`](src/web/dist/) and embedded in the Go binary at compile time.
 
 ![Vidvault web UI (gallery)](docs/Screenshot.png)
 
@@ -9,15 +9,51 @@ Local **Go** HTTP server that turns a directory into a **video gallery**: it dis
 ## Requirements
 
 - [Go](https://go.dev/dl/) **1.24.5**+ (see [`go.mod`](go.mod))
-- A modern desktop browser (HTML, CSS, and client-side JavaScript)
+- [Node.js](https://nodejs.org/) **18+** — required to build the frontend (`npm run build:frontend`)
+- A modern desktop browser
 
-Optional, for formatting frontend JavaScript:
+Optional, for formatting frontend sources:
 
-- [Node.js](https://nodejs.org/) — run `npm install` and `npm run format`
+- Run `npm install` at the repo root and `npm run format`
+
+## Build
+
+Production build (frontend + Go binary):
+
+```bash
+npm install
+cd frontend && npm install && cd ..
+npm run build
+```
+
+This runs `npm run build:frontend` (Vite → `src/web/dist/`) then `go build -o vidvault ./src`.
+
+Go-only rebuild after the frontend is already built:
+
+```bash
+go build -o vidvault ./src
+```
+
+## Development workflow
+
+Terminal 1 — Go API server:
+
+```bash
+go build -o vidvault ./src && ./vidvault -disable-browser -p 8765 ./data
+```
+
+Terminal 2 — Vite dev server (proxies `/api` and `/video` to port 8765):
+
+```bash
+cd frontend && npm install && npm run dev
+```
+
+Open http://localhost:5173
 
 ## Run from source
 
 ```bash
+npm run build:frontend   # or: go build after a prior frontend build
 go build -o vidvault ./src
 ./vidvault
 ```

@@ -1,159 +1,161 @@
-const gallery = document.getElementById("gallery"),
-	folderList = document.getElementById("folder-list"),
-	incomingList = document.getElementById("incoming-list"),
-	tagList = document.getElementById("tag-list"),
-	searchEl = document.getElementById("search"),
-	statsEl = document.getElementById("stats"),
-	sortSel = document.getElementById("sort-select"),
-	gridBtn = document.getElementById("grid-btn"),
-	listBtn = document.getElementById("list-btn"),
-	favoritesOnlyToggle = document.getElementById("favorites-only-toggle"),
-	modal = document.getElementById("modal"),
-	modalVid = document.getElementById("modal-video"),
-	modalTitle = document.getElementById("modal-title"),
-	modalPath = document.getElementById("modal-path"),
-	prevBtn = document.getElementById("prev-btn"),
-	nextBtn = document.getElementById("next-btn"),
-	closeBtn = document.getElementById("close-btn"),
-	selectBtn = document.getElementById("select-btn"),
-	selectBar = document.getElementById("select-bar"),
-	selectCount = document.getElementById("select-count"),
-	selectTagBtn = document.getElementById("select-tag-btn"),
-	selectMoveBtn = document.getElementById("select-move-btn"),
-	selectForgetBtn = document.getElementById("select-forget-btn"),
-	selectAllBtn = document.getElementById("select-all-btn"),
-	selectClearBtn = document.getElementById("select-clear-btn"),
-	newFolderBtn = document.getElementById("new-folder-btn"),
-	sidebarFolderForm = document.getElementById("sidebar-folder-form"),
-	sidebarFolderInput = document.getElementById("sidebar-folder-input"),
-	sidebarFolderConfirm = document.getElementById("sidebar-folder-confirm"),
-	sidebarFolderCancel = document.getElementById("sidebar-folder-cancel"),
-	newTagBtn = document.getElementById("new-tag-btn"),
-	sidebarTagForm = document.getElementById("sidebar-tag-form"),
-	sidebarTagInput = document.getElementById("sidebar-tag-input"),
-	sidebarTagConfirm = document.getElementById("sidebar-tag-confirm"),
-	sidebarTagCancel = document.getElementById("sidebar-tag-cancel"),
-	newCollectionBtn = document.getElementById("new-collection-btn"),
-	sidebarCollectionForm = document.getElementById("sidebar-collection-form"),
-	sidebarCollectionInput = document.getElementById(
-		"sidebar-collection-input",
-	),
-	sidebarCollectionConfirm = document.getElementById(
-		"sidebar-collection-confirm",
-	),
-	sidebarCollectionCancel = document.getElementById(
-		"sidebar-collection-cancel",
-	),
-	collectionList = document.getElementById("collection-list"),
-	collectionsCollapseBtn = document.getElementById(
-		"collections-collapse-btn",
-	),
-	tagsCollapseBtn = document.getElementById("tags-collapse-btn"),
-	foldersCollapseBtn = document.getElementById("folders-collapse-btn"),
-	tagsSection = tagsCollapseBtn.closest(".sidebar-section"),
-	foldersSection = foldersCollapseBtn.closest(".sidebar-section"),
-	collectionsSection = collectionsCollapseBtn.closest(".sidebar-section"),
-	dupBanner = document.getElementById("dup-banner"),
-	dupBannerText = document.getElementById("dup-banner-text"),
-	dupReviewBtn = document.getElementById("dup-review-btn"),
-	dupDismissBtn = document.getElementById("dup-dismiss-btn"),
-	dupModal = document.getElementById("dup-modal"),
-	dupSubtitle = document.getElementById("dup-subtitle"),
-	dupGroupsEl = document.getElementById("dup-groups"),
-	dupClose = document.getElementById("dup-close"),
-	dupCancelBtn = document.getElementById("dup-cancel-btn"),
-	dupResolveAllBtn = document.getElementById("dup-resolve-all-btn"),
-	incomingBanner = document.getElementById("incoming-banner"),
-	incomingBannerText = document.getElementById("incoming-banner-text"),
-	incomingReviewBtn = document.getElementById("incoming-review-btn"),
-	incomingMassSortBtn = document.getElementById("incoming-mass-sort-btn"),
-	incomingDismissBtn = document.getElementById("incoming-dismiss-btn"),
-	incomingMarkAllBtn = document.getElementById("incoming-mark-all-btn"),
-	incomingSidebarSection = document.getElementById(
-		"incoming-sidebar-section",
-	),
-	incomingModal = document.getElementById("incoming-modal"),
-	incomingSubtitle = document.getElementById("incoming-subtitle"),
-	incomingTagOptions = document.getElementById("incoming-tag-options"),
-	incomingFolderOptions = document.getElementById("incoming-folder-options"),
-	incomingClose = document.getElementById("incoming-close"),
-	incomingCancelBtn = document.getElementById("incoming-cancel-btn"),
-	incomingConfirmBtn = document.getElementById("incoming-confirm-btn"),
-	incomingMarkReviewedBtn = document.getElementById("incoming-mark-reviewed-btn"),
-	tagModal = document.getElementById("tag-modal"),
-	tagSubtitle = document.getElementById("tag-subtitle"),
-	tagOptions = document.getElementById("tag-options"),
-	tagPendingSummary = document.getElementById("tag-pending-summary"),
-	tagClose = document.getElementById("tag-close"),
-	tagApplyBtn = document.getElementById("tag-apply-btn"),
-	tagCancelBtn = document.getElementById("tag-cancel-btn"),
-	tagNewInput = document.getElementById("tag-new-input"),
-	tagNewBtn = document.getElementById("tag-new-btn"),
-	selectCollectionBtn = document.getElementById("select-collection-btn"),
-	collectionPickerModal = document.getElementById("collection-picker-modal"),
-	collectionPickerSubtitle = document.getElementById(
-		"collection-picker-subtitle",
-	),
-	collectionPickerOptions = document.getElementById(
-		"collection-picker-options",
-	),
-	collectionPickerClose = document.getElementById("collection-picker-close"),
-	collectionPickerCancelBtn = document.getElementById(
-		"collection-picker-cancel-btn",
-	),
-	collectionPickerConfirmBtn = document.getElementById(
-		"collection-picker-confirm-btn",
-	),
-	collectionPickerNewInput = document.getElementById(
-		"collection-picker-new-input",
-	),
-	collectionPickerNewBtn = document.getElementById(
-		"collection-picker-new-btn",
-	),
-	watchCollectionModal = document.getElementById("watch-collection-modal"),
-	watchCollectionTitle = document.getElementById("watch-collection-title"),
-	watchCollectionSubtitle = document.getElementById(
-		"watch-collection-subtitle",
-	),
-	watchCollectionBody = document.getElementById("watch-collection-body"),
-	watchCollectionClose = document.getElementById("watch-collection-close"),
-	watchCollectionDeleteBtn = document.getElementById(
-		"watch-collection-delete-btn",
-	),
-	watchCollectionRenameBtn = document.getElementById(
-		"watch-collection-rename-btn",
-	),
-	watchCollectionPlayAllBtn = document.getElementById(
-		"watch-collection-play-all-btn",
-	),
-	watchCollectionPauseAllBtn = document.getElementById(
-		"watch-collection-pause-all-btn",
-	),
-	watchCollectionMuteAllBtn = document.getElementById(
-		"watch-collection-mute-all-btn",
-	),
-	watchCollectionVolumeInput = document.getElementById(
-		"watch-collection-volume-input",
-	),
-	watchCollectionGridCols = document.getElementById(
-		"watch-collection-grid-cols",
-	),
-	previewSettingsModal = document.getElementById("preview-settings-modal"),
-	previewSettingsClose = document.getElementById("preview-settings-close"),
-	previewSettingsLauncher = document.getElementById(
-		"preview-settings-launcher",
-	),
-	previewSettingsAudioToggleBtn = document.getElementById(
-		"preview-settings-audio-toggle",
-	),
-	previewSettingsVolumeInput = document.getElementById(
-		"preview-settings-volume",
-	),
-	pinGateOverlay = document.getElementById("pin-gate-overlay"),
-	pinGateForm = document.getElementById("pin-gate-form"),
-	pinGateInput = document.getElementById("pin-gate-input"),
-	pinGateError = document.getElementById("pin-gate-error");
-let pinLockBtn = document.getElementById("pin-lock-btn");
+<script lang="ts">
+import { onMount } from 'svelte';
+import './app.css';
+import { escHtml, formatBytes, formatModified } from './lib/format';
+import {
+	loadBooleanStorage,
+	loadNumericStorage,
+	persistStorageValue,
+	WATCH_GRID_COLS_STORAGE_KEY,
+	WATCH_GRID_VOLUME_STORAGE_KEY,
+	WATCH_GRID_MUTED_STORAGE_KEY,
+	HOVER_PREVIEW_AUDIO_ENABLED_KEY,
+	HOVER_PREVIEW_VOLUME_KEY,
+} from './lib/storage';
+import {
+	installFetch401Handler,
+	setOnPinLock,
+	setPinGateMode,
+	setPinGateUnlocked,
+} from './lib/auth';
+
+let gallery: HTMLElement | null = null;
+let folderList: HTMLElement | null = null;
+let incomingList: HTMLElement | null = null;
+let tagList: HTMLElement | null = null;
+let searchEl: HTMLInputElement | null = null;
+let statsEl: HTMLElement | null = null;
+let sortSel: HTMLSelectElement | null = null;
+let gridBtn: HTMLElement | null = null;
+let listBtn: HTMLElement | null = null;
+let favoritesOnlyToggle: HTMLInputElement | null = null;
+let modal: HTMLElement | null = null;
+let modalVid: HTMLVideoElement | null = null;
+let modalTitle: HTMLElement | null = null;
+let modalPath: HTMLElement | null = null;
+let prevBtn: HTMLElement | null = null;
+let nextBtn: HTMLElement | null = null;
+let closeBtn: HTMLElement | null = null;
+let selectBtn: HTMLElement | null = null;
+let selectBar: HTMLElement | null = null;
+let selectCount: HTMLElement | null = null;
+let selectTagBtn: HTMLElement | null = null;
+let selectMoveBtn: HTMLElement | null = null;
+let selectForgetBtn: HTMLElement | null = null;
+let selectAllBtn: HTMLElement | null = null;
+let selectClearBtn: HTMLElement | null = null;
+let newFolderBtn: HTMLElement | null = null;
+let sidebarFolderForm: HTMLElement | null = null;
+let sidebarFolderInput: HTMLInputElement | null = null;
+let sidebarFolderConfirm: HTMLElement | null = null;
+let sidebarFolderCancel: HTMLElement | null = null;
+let newTagBtn: HTMLElement | null = null;
+let sidebarTagForm: HTMLElement | null = null;
+let sidebarTagInput: HTMLInputElement | null = null;
+let sidebarTagConfirm: HTMLElement | null = null;
+let sidebarTagCancel: HTMLElement | null = null;
+let newCollectionBtn: HTMLElement | null = null;
+let sidebarCollectionForm: HTMLElement | null = null;
+let sidebarCollectionInput: HTMLInputElement | null = null;
+let sidebarCollectionConfirm: HTMLElement | null = null;
+let sidebarCollectionCancel: HTMLElement | null = null;
+let collectionList: HTMLElement | null = null;
+let collectionsCollapseBtn: HTMLElement | null = null;
+let tagsCollapseBtn: HTMLElement | null = null;
+let foldersCollapseBtn: HTMLElement | null = null;
+let dupBanner: HTMLElement | null = null;
+let dupBannerText: HTMLElement | null = null;
+let dupReviewBtn: HTMLElement | null = null;
+let dupDismissBtn: HTMLElement | null = null;
+let dupModal: HTMLElement | null = null;
+let dupSubtitle: HTMLElement | null = null;
+let dupGroupsEl: HTMLElement | null = null;
+let dupClose: HTMLElement | null = null;
+let dupCancelBtn: HTMLElement | null = null;
+let dupResolveAllBtn: HTMLElement | null = null;
+let incomingBanner: HTMLElement | null = null;
+let incomingBannerText: HTMLElement | null = null;
+let incomingReviewBtn: HTMLElement | null = null;
+let incomingMassSortBtn: HTMLElement | null = null;
+let incomingDismissBtn: HTMLElement | null = null;
+let incomingMarkAllBtn: HTMLElement | null = null;
+let incomingSidebarSection: HTMLElement | null = null;
+let incomingModal: HTMLElement | null = null;
+let incomingSubtitle: HTMLElement | null = null;
+let incomingTagOptions: HTMLElement | null = null;
+let incomingFolderOptions: HTMLElement | null = null;
+let incomingClose: HTMLElement | null = null;
+let incomingCancelBtn: HTMLElement | null = null;
+let incomingConfirmBtn: HTMLElement | null = null;
+let incomingMarkReviewedBtn: HTMLElement | null = null;
+let tagModal: HTMLElement | null = null;
+let tagSubtitle: HTMLElement | null = null;
+let tagOptions: HTMLElement | null = null;
+let tagPendingSummary: HTMLElement | null = null;
+let tagClose: HTMLElement | null = null;
+let tagApplyBtn: HTMLElement | null = null;
+let tagCancelBtn: HTMLElement | null = null;
+let tagNewInput: HTMLInputElement | null = null;
+let tagNewBtn: HTMLElement | null = null;
+let selectCollectionBtn: HTMLElement | null = null;
+let collectionPickerModal: HTMLElement | null = null;
+let collectionPickerSubtitle: HTMLElement | null = null;
+let collectionPickerOptions: HTMLElement | null = null;
+let collectionPickerClose: HTMLElement | null = null;
+let collectionPickerCancelBtn: HTMLElement | null = null;
+let collectionPickerConfirmBtn: HTMLElement | null = null;
+let collectionPickerNewInput: HTMLInputElement | null = null;
+let collectionPickerNewBtn: HTMLElement | null = null;
+let watchCollectionModal: HTMLElement | null = null;
+let watchCollectionTitle: HTMLElement | null = null;
+let watchCollectionSubtitle: HTMLElement | null = null;
+let watchCollectionBody: HTMLElement | null = null;
+let watchCollectionClose: HTMLElement | null = null;
+let watchCollectionDeleteBtn: HTMLElement | null = null;
+let watchCollectionRenameBtn: HTMLElement | null = null;
+let watchCollectionPlayAllBtn: HTMLElement | null = null;
+let watchCollectionPauseAllBtn: HTMLElement | null = null;
+let watchCollectionMuteAllBtn: HTMLElement | null = null;
+let watchCollectionVolumeInput: HTMLInputElement | null = null;
+let watchCollectionGridCols: HTMLSelectElement | null = null;
+let previewSettingsModal: HTMLElement | null = null;
+let previewSettingsClose: HTMLElement | null = null;
+let previewSettingsLauncher: HTMLElement | null = null;
+let previewSettingsAudioToggleBtn: HTMLElement | null = null;
+let previewSettingsVolumeInput: HTMLInputElement | null = null;
+let pinGateOverlay: HTMLElement | null = null;
+let pinGateForm: HTMLElement | null = null;
+let pinGateInput: HTMLInputElement | null = null;
+let pinGateError: HTMLElement | null = null;
+let ctxMenu: HTMLElement | null = null;
+let ctxTagsEl: HTMLElement | null = null;
+let ctxMoveEl: HTMLElement | null = null;
+let ctxRenameEl: HTMLElement | null = null;
+let ctxDeleteEl: HTMLElement | null = null;
+let ctxForgetEl: HTMLElement | null = null;
+let moveModal: HTMLElement | null = null;
+let moveSubtitle: HTMLElement | null = null;
+let folderOptions: HTMLElement | null = null;
+let newFolderName: HTMLInputElement | null = null;
+let addFolderBtn: HTMLElement | null = null;
+let moveCancelBtn: HTMLElement | null = null;
+let moveConfirmBtn: HTMLElement | null = null;
+let moveClose: HTMLElement | null = null;
+let uploadModal: HTMLElement | null = null;
+let dropZone: HTMLElement | null = null;
+let uploadInput: HTMLInputElement | null = null;
+let uploadFolderSel: HTMLSelectElement | null = null;
+let newFolderInput: HTMLInputElement | null = null;
+let fileQueue: HTMLElement | null = null;
+let uploadSummary: HTMLElement | null = null;
+let uploadStartBtn: HTMLElement | null = null;
+let uploadCancelBtn: HTMLElement | null = null;
+let uploadClose: HTMLElement | null = null;
+let openUploadBtn: HTMLElement | null = null;
+let tagsSection: HTMLElement | null = null;
+let foldersSection: HTMLElement | null = null;
+let collectionsSection: HTMLElement | null = null;
+let pinLockBtn: HTMLElement | null = null;
 
 let ALL_VIDEOS = [],
 	DISCOVERED_VIDEOS = [],
@@ -179,27 +181,10 @@ let showFavoritesOnly = false;
 let pinGateMode = false;
 let pinGateUnlocked = false;
 let isVideoDiscoveryLoading = false;
-/** @type {HTMLDivElement | null} */
 let cardDragGhostEl = null;
 let tagTargetPaths = [];
 let pendingTagActions = new Map();
 let activeCollectionID = "";
-const WATCH_GRID_COLS_STORAGE_KEY = "vidvault.watchGridCols";
-const WATCH_GRID_VOLUME_STORAGE_KEY = "vidvault.watchCollectionVolume";
-const WATCH_GRID_MUTED_STORAGE_KEY = "vidvault.watchCollectionMuted";
-let watchGridCols = loadNumericStorage(WATCH_GRID_COLS_STORAGE_KEY, 4, 1, 4);
-let watchCollectionMasterVolume = loadNumericStorage(
-	WATCH_GRID_VOLUME_STORAGE_KEY,
-	1,
-	0,
-	1,
-);
-let watchCollectionMasterMuted = loadBooleanStorage(
-	WATCH_GRID_MUTED_STORAGE_KEY,
-	false,
-);
-const HOVER_PREVIEW_AUDIO_ENABLED_KEY = "vidvault.hoverPreviewAudioEnabled";
-const HOVER_PREVIEW_VOLUME_KEY = "vidvault.hoverPreviewVolume";
 const HOVER_PREVIEW_SEEK_SEC = 2;
 const PREVIEW_AUDIO_SVG_OFF =
 	'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>';
@@ -224,34 +209,6 @@ const DEFAULT_LOOP_ALL_VIDEOS = true;
 function applyDefaultVideoFlags(videoEl) {
 	if (!videoEl) return;
 	videoEl.loop = DEFAULT_LOOP_ALL_VIDEOS;
-}
-
-function loadNumericStorage(key, fallback, min, max) {
-	try {
-		const raw = localStorage.getItem(key);
-		if (raw === null) return fallback;
-		const value = Number(raw);
-		if (Number.isNaN(value)) return fallback;
-		return Math.max(min, Math.min(max, value));
-	} catch (e) {
-		return fallback;
-	}
-}
-
-function loadBooleanStorage(key, fallback) {
-	try {
-		const raw = localStorage.getItem(key);
-		if (raw === null) return fallback;
-		return raw === "true";
-	} catch (e) {
-		return fallback;
-	}
-}
-
-function persistStorageValue(key, value) {
-	try {
-		localStorage.setItem(key, String(value));
-	} catch (e) {}
 }
 
 function applyHoverPreviewAudioToElement(videoEl) {
@@ -679,42 +636,6 @@ function updatePinLockButton() {
 	pinLockBtn.hidden = !(pinGateMode && pinGateUnlocked);
 }
 
-function isAuthPinFetchArg(input) {
-	const raw = typeof input === "string" ? input : input && input.url;
-	if (!raw) return false;
-	try {
-		return new URL(raw, location.href).pathname === "/api/auth/pin";
-	} catch {
-		return false;
-	}
-}
-
-function installFetch401Handler() {
-	if (window.__vidvaultFetchPatched) return;
-	window.__vidvaultFetchPatched = true;
-	const orig = window.fetch.bind(window);
-	window.fetch = function (input, init) {
-		const merged = init ? { ...init } : {};
-		if (!merged.credentials) merged.credentials = "same-origin";
-		return orig(input, merged).then((res) => {
-			if (
-				res.status === 401 &&
-				pinGateMode &&
-				!isAuthPinFetchArg(input)
-			) {
-				pinGateUnlocked = false;
-				updatePinLockButton();
-				unloadLibraryAfterPinLock();
-				setPinOverlayVisible(
-					true,
-					"Session locked or PIN required.",
-				);
-			}
-			return res;
-		});
-	};
-}
-
 async function bootstrap() {
 	let st;
 	try {
@@ -725,7 +646,9 @@ async function bootstrap() {
 		return;
 	}
 	if (!st.pinRequired) {
+		setPinGateMode(false);
 		pinGateMode = false;
+		setPinGateUnlocked(false);
 		pinGateUnlocked = false;
 		if (pinLockBtn) {
 			pinLockBtn.remove();
@@ -734,15 +657,18 @@ async function bootstrap() {
 		await init();
 		return;
 	}
+	setPinGateMode(true);
 	pinGateMode = true;
 	installFetch401Handler();
 	if (st.authenticated) {
+		setPinGateUnlocked(true);
 		pinGateUnlocked = true;
 		setPinOverlayVisible(false);
 		updatePinLockButton();
 		await init();
 		return;
 	}
+	setPinGateUnlocked(false);
 	pinGateUnlocked = false;
 	updatePinLockButton();
 	setPinOverlayVisible(true);
@@ -1496,49 +1422,6 @@ function render() {
 }
 
 /**
- * Formats bytes as a human-readable string.
- * @param {number} bytes
- * @returns {string}
- */
-function formatBytes(bytes) {
-	const n = Number(bytes) || 0;
-	if (n < 1024) return n + " B";
-	const units = ["KB", "MB", "GB", "TB"];
-	let value = n;
-	let idx = -1;
-	while (value >= 1024 && idx < units.length - 1) {
-		value /= 1024;
-		idx++;
-	}
-	return value.toFixed(value >= 10 ? 0 : 1) + " " + units[idx];
-}
-
-/**
- * Formats an ISO date/time string for card display.
- * @param {string} iso
- * @returns {string}
- */
-function formatModified(iso) {
-	if (!iso) return "unknown";
-	const d = new Date(iso);
-	if (Number.isNaN(d.getTime())) return "unknown";
-	return d.toLocaleString();
-}
-
-/**
- * Escapes a string for safe insertion into HTML attribute values or text nodes.
- * @param {string} s
- * @returns {string}
- */
-function escHtml(s) {
-	return s
-		.replace(/&/g, "&amp;")
-		.replace(/</g, "&lt;")
-		.replace(/>/g, "&gt;")
-		.replace(/"/g, "&quot;");
-}
-
-/**
  * Opens the video lightbox for the item at index idx within the current
  * filtered list.
  * @param {number} idx
@@ -1560,107 +1443,62 @@ function closeModal() {
 	modalVid.pause();
 	modalVid.src = "";
 }
-closeBtn.addEventListener("click", closeModal);
-modal.addEventListener("click", (e) => {
-	if (e.target === modal) closeModal();
-});
-prevBtn.addEventListener("click", () => {
-	if (currentIdx > 0) openModal(currentIdx - 1);
-});
-nextBtn.addEventListener("click", () => {
-	if (currentIdx < filtered.length - 1) openModal(currentIdx + 1);
-});
-modalVid.addEventListener("ended", () => {
-	if (currentIdx < filtered.length - 1) openModal(currentIdx + 1);
-});
-document.addEventListener("keydown", (e) => {
-	if (
-		e.key === "Escape" &&
-		previewSettingsModal &&
-		previewSettingsModal.classList.contains("open")
-	) {
-		closePreviewSettings();
-		return;
-	}
-	if (!modal.classList.contains("open")) return;
-	if (e.key === "Escape") closeModal();
-	if (e.key === "ArrowLeft") prevBtn.click();
-	if (e.key === "ArrowRight") nextBtn.click();
-});
 
-// context menu
-const ctxMenu = document.getElementById("ctx-menu"),
-	ctxTagsEl = document.getElementById("ctx-tags"),
-	ctxMoveEl = document.getElementById("ctx-move"),
-	ctxRenameEl = document.getElementById("ctx-rename"),
-	ctxDeleteEl = document.getElementById("ctx-delete"),
-	ctxForgetEl = document.getElementById("ctx-forget");
+/** Rebuilds the destination folder <select> in the upload modal from the
+ *  current ALL_FOLDERS / ALL_VIDEOS state, preserving the previous selection. */
+function populateUploadFolders() {
+	if (!uploadFolderSel) return;
+	const folders = [
+		...new Set([
+			"/",
+			...ALL_FOLDERS,
+			...ALL_VIDEOS.map((v) => v.folder || "/"),
+		]),
+	].sort();
+	const prev = uploadFolderSel.value;
+	uploadFolderSel.innerHTML = "";
+	for (const f of folders) {
+		const o = document.createElement("option");
+		o.value = f;
+		o.textContent = f === "/" ? "Root (/)" : f;
+		uploadFolderSel.appendChild(o);
+	}
+	const no = document.createElement("option");
+	no.value = "__new__";
+	no.textContent = "+ new folder…";
+	uploadFolderSel.appendChild(no);
+	if (prev && [...uploadFolderSel.options].some((o) => o.value === prev))
+		uploadFolderSel.value = prev;
+}
+
+// --- hoisted from wireAppEvents (module scope) ---
 let ctxVideo = null;
-/**
- * Positions and shows the card context menu at the pointer location.
- * @param {MouseEvent} e
- * @param {{ name: string, path: string, folder: string }} v - The video the menu was opened for.
- */
+let moveTarget = null;
+let moveSelectedFolder = null;
+let uploadFiles = [];
+let collectionPickerSelectedID = "";
+const ALLOWED_EXTS = new Set([
+	"webm",
+	"mp4",
+	"mpv",
+	"mkv",
+	"mov",
+	"avi",
+	"m4v",
+	"ogv",
+]);
+
 function showCtxMenu(e, v) {
 	ctxVideo = v;
 	ctxMenu.style.left = Math.min(e.clientX, window.innerWidth - 180) + "px";
 	ctxMenu.style.top = Math.min(e.clientY, window.innerHeight - 60) + "px";
 	ctxMenu.classList.add("open");
 }
-document.addEventListener("click", () => ctxMenu.classList.remove("open"));
-ctxTagsEl.addEventListener("click", () => {
-	if (ctxVideo) openTagModal(ctxVideo);
-});
-ctxMoveEl.addEventListener("click", () => {
-	if (ctxVideo) openMoveModal(ctxVideo);
-});
-ctxRenameEl.addEventListener("click", async () => {
-	if (!ctxVideo) return;
-	const next = prompt("Rename file (new base name)", ctxVideo.name);
-	if (next == null) return;
-	const trimmed = next.trim();
-	if (!trimmed) return;
-	const res = await renameVideoPath(ctxVideo.path, trimmed);
-	if (res.ok) {
-		toast("Renamed file", "success");
-		await refresh();
-	} else {
-		toast("Rename failed: " + res.message, "error");
-	}
-});
-ctxForgetEl.addEventListener("click", async () => {
-	if (!ctxVideo) return;
-	const ok = await forgetVideos([ctxVideo.path], [], false);
-	if (!ok) {
-		toast("Failed to forget file", "error");
-		return;
-	}
-	toast("File forgotten and re-queued", "success");
-	await refresh();
-});
-ctxDeleteEl.addEventListener("click", async () => {
-	if (!ctxVideo) return;
-	const ok = confirm(
-		'Delete "' +
-			ctxVideo.name +
-			'"?\n\nThis removes the file from disk and cannot be undone.',
-	);
-	if (!ok) return;
-	const res = await deleteVideoPath(ctxVideo.path);
-	if (res.ok) {
-		toast("Deleted " + ctxVideo.name, "success");
-		await refresh();
-	} else {
-		toast("Delete failed: " + res.message, "error");
-	}
-});
-
 function resolveTagTargets() {
 	return tagTargetPaths
 		.map((path) => ALL_VIDEOS.find((v) => v.path === path))
 		.filter(Boolean);
 }
-
 function openTagModal(videoOrVideos) {
 	const videos = Array.isArray(videoOrVideos)
 		? videoOrVideos
@@ -1675,13 +1513,11 @@ function openTagModal(videoOrVideos) {
 	renderTagOptions();
 	tagModal.classList.add("open");
 }
-
 function closeTagModal() {
 	tagModal.classList.remove("open");
 	tagTargetPaths = [];
 	pendingTagActions = new Map();
 }
-
 function getPendingTagActionEntries() {
 	const validTagIDs = new Set(ALL_TAGS.map((tag) => tag.id));
 	const entries = [];
@@ -1692,7 +1528,6 @@ function getPendingTagActionEntries() {
 	}
 	return entries;
 }
-
 function renderTagPendingSummary() {
 	const entries = getPendingTagActionEntries();
 	let addCount = 0;
@@ -1709,7 +1544,6 @@ function renderTagPendingSummary() {
 		: "No pending tag changes";
 	tagApplyBtn.disabled = entries.length === 0;
 }
-
 function renderTagOptions() {
 	tagOptions.innerHTML = "";
 	const targets = resolveTagTargets();
@@ -1796,104 +1630,6 @@ function renderTagOptions() {
 	}
 	renderTagPendingSummary();
 }
-
-tagNewBtn.addEventListener("click", async () => {
-	const name = tagNewInput.value.trim();
-	if (!name) return;
-	const created = await createTag(name);
-	if (!created) {
-		toast("Tag create failed", "error");
-		return;
-	}
-	tagNewInput.value = "";
-	try {
-		await refreshTagsOnly();
-		buildTagNav();
-	} catch (e) {
-		await refresh();
-	}
-	renderTagOptions();
-});
-tagNewInput.addEventListener("keydown", (e) => {
-	if (e.key === "Enter") tagNewBtn.click();
-});
-tagClose.addEventListener("click", closeTagModal);
-tagApplyBtn.addEventListener("click", async () => {
-	const entries = getPendingTagActionEntries();
-	if (!entries.length) return;
-	const liveTargets = resolveTagTargets();
-	const hashes = [...new Set(liveTargets.map((v) => v.hash).filter(Boolean))];
-	if (!hashes.length) {
-		toast("No taggable videos selected", "error");
-		return;
-	}
-
-	const addingNames = entries
-		.filter(([, action]) => action === "add")
-		.map(([tagID]) => TAG_MAP[tagID]?.name || tagID);
-	const removingNames = entries
-		.filter(([, action]) => action === "remove")
-		.map(([tagID]) => TAG_MAP[tagID]?.name || tagID);
-	const confirmLines = [
-		"Apply tag changes to " + hashes.length + " videos?",
-	];
-	if (addingNames.length) confirmLines.push("Add: " + addingNames.join(", "));
-	if (removingNames.length)
-		confirmLines.push("Remove: " + removingNames.join(", "));
-	if (!confirm(confirmLines.join("\n"))) return;
-
-	recomputeFiltered();
-	const prevFilteredPaths = filtered.map((v) => v.path);
-
-	let failures = 0;
-	for (const [tagID, action] of entries) {
-		const ok = await setTagAssignmentsBulk(hashes, tagID, action === "add");
-		if (!ok) failures++;
-	}
-	if (failures) {
-		toast(failures + " tag update(s) failed", "error");
-		await refresh();
-		renderTagOptions();
-		return;
-	}
-
-	try {
-		await refreshTagsOnly();
-		await refreshTagAssignmentsForHashes(hashes);
-		refreshAfterTagDataChange(prevFilteredPaths, hashes);
-	} catch (e) {
-		await refresh();
-	}
-	pendingTagActions = new Map();
-	renderTagOptions();
-	toast("Tag changes applied", "success");
-	if (selectMode) {
-		closeTagModal();
-		exitSelectMode();
-	}
-});
-tagCancelBtn.addEventListener("click", closeTagModal);
-tagModal.addEventListener("click", (e) => {
-	if (e.target === tagModal) closeTagModal();
-});
-
-// move modal
-const moveModal = document.getElementById("move-modal"),
-	moveSubtitle = document.getElementById("move-subtitle"),
-	folderOptions = document.getElementById("folder-options"),
-	newFolderName = document.getElementById("new-folder-name"),
-	addFolderBtn = document.getElementById("add-folder-btn"),
-	moveCancelBtn = document.getElementById("move-cancel-btn"),
-	moveConfirmBtn = document.getElementById("move-confirm-btn"),
-	moveClose = document.getElementById("move-close");
-let moveTarget = null,
-	moveSelectedFolder = null;
-
-/**
- * Opens the move-to-folder modal for a single video. When selectedPaths has
- * more than one entry the subtitle reflects the multi-selection count instead.
- * @param {{ name: string, path: string, folder: string }} v
- */
 function openMoveModal(v) {
 	moveTarget = v;
 	moveSubtitle.textContent =
@@ -1905,8 +1641,6 @@ function openMoveModal(v) {
 	renderFolderOptions();
 	moveModal.classList.add("open");
 }
-/** Rebuilds the folder option list inside the move modal, reflecting the
- *  current ALL_FOLDERS / ALL_VIDEOS state and highlighting moveSelectedFolder. */
 function renderFolderOptions() {
 	const folders = [
 		...new Set([...ALL_FOLDERS, ...ALL_VIDEOS.map((v) => v.folder || "/")]),
@@ -1929,57 +1663,9 @@ function renderFolderOptions() {
 		folderOptions.appendChild(opt);
 	}
 }
-addFolderBtn.addEventListener("click", () => {
-	const n = newFolderName.value.trim();
-	if (!n) return;
-	if (!ALL_FOLDERS.includes(n)) ALL_FOLDERS.push(n);
-	newFolderName.value = "";
-	moveSelectedFolder = n;
-	renderFolderOptions();
-});
-newFolderName.addEventListener("keydown", (e) => {
-	if (e.key === "Enter") addFolderBtn.click();
-});
-/** Closes the move-to-folder modal without taking any action. */
 function closeMoveModal() {
 	moveModal.classList.remove("open");
 }
-moveClose.addEventListener("click", closeMoveModal);
-moveCancelBtn.addEventListener("click", closeMoveModal);
-moveModal.addEventListener("click", (e) => {
-	if (e.target === moveModal) closeMoveModal();
-});
-moveConfirmBtn.addEventListener("click", async () => {
-	if (!moveSelectedFolder) return;
-	const paths =
-		selectedPaths.size > 0
-			? [...selectedPaths]
-			: moveTarget
-				? [moveTarget.path]
-				: [];
-	if (!paths.length) return;
-	let errs = 0;
-	for (const p of paths) {
-		const res = await fetch("/api/move", {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ path: p, dest_folder: moveSelectedFolder }),
-		});
-		if (!res.ok) errs++;
-	}
-	await refresh();
-	if (errs) toast(errs + " move(s) failed", "error");
-	else
-		toast(
-			"Moved " +
-				(paths.length > 1 ? paths.length + " items" : "") +
-				(paths.length > 1 ? " to " : "") +
-				moveSelectedFolder,
-			"success",
-		);
-	if (selectMode) exitSelectMode();
-	closeMoveModal();
-});
 function movedVideoRelPath(srcPath, destFolder) {
 	const slash = srcPath.lastIndexOf("/");
 	const base = slash >= 0 ? srcPath.slice(slash + 1) : srcPath;
@@ -1990,14 +1676,12 @@ function movedVideoRelPath(srcPath, destFolder) {
 		: base;
 	return rel.replace(/\\/g, "/");
 }
-
 function folderFromRelPath(relPath) {
 	const i = relPath.lastIndexOf("/");
 	if (i < 0) return "/";
 	const dir = relPath.slice(0, i);
 	return dir === "" ? "/" : dir.replace(/\\/g, "/");
 }
-
 function galleryCardSelectorForPath(p) {
 	const esc =
 		typeof CSS !== "undefined" && typeof CSS.escape === "function"
@@ -2005,12 +1689,10 @@ function galleryCardSelectorForPath(p) {
 			: String(p).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 	return '.card[data-path="' + esc + '"]';
 }
-
 function removeGalleryCardByPath(path) {
 	const card = gallery.querySelector(galleryCardSelectorForPath(path));
 	if (card) card.remove();
 }
-
 function patchVideoCardDomAfterPathChange(card, v) {
 	card.dataset.path = v.path;
 	const folderSpans = card.querySelectorAll(".card-path");
@@ -2040,12 +1722,6 @@ function patchVideoCardDomAfterPathChange(card, v) {
 		modalVid.src = "/video?path=" + encodeURIComponent(v.path);
 	}
 }
-
-/**
- * Updates ALL_VIDEOS and the gallery DOM after a successful /api/move without
- * refetching every video when the moved file is already known.
- * @returns {boolean} false if the source path was not in ALL_VIDEOS (caller should full refresh).
- */
 function applyVideoMoveLocally(srcPath, destFolder) {
 	const vi = ALL_VIDEOS.findIndex((v) => v && v.path === srcPath);
 	if (vi < 0) return false;
@@ -2104,13 +1780,6 @@ function applyVideoMoveLocally(srcPath, destFolder) {
 	if (selectMode) updateSelectBar();
 	return true;
 }
-
-/**
- * Moves a single video file to destFolder via POST /api/move, then updates
- * the UI (incrementally when possible). Shows a success or error toast on completion.
- * @param {string} srcPath - Relative path of the file to move.
- * @param {string} destFolder - Destination folder name relative to root.
- */
 async function moveVideo(srcPath, destFolder) {
 	const res = await fetch("/api/move", {
 		method: "POST",
@@ -2137,7 +1806,6 @@ async function moveVideo(srcPath, destFolder) {
 		toast("Move failed: " + (await res.text()), "error");
 	}
 }
-
 function openIncomingModal() {
 	const incoming = ALL_VIDEOS.filter((v) => Boolean(v.is_new));
 	incomingSubtitle.textContent =
@@ -2150,11 +1818,9 @@ function openIncomingModal() {
 	renderIncomingFolderOptions();
 	incomingModal.classList.add("open");
 }
-
 function closeIncomingModal() {
 	incomingModal.classList.remove("open");
 }
-
 function renderIncomingFolderOptions() {
 	const folders = [
 		...new Set([...ALL_FOLDERS, ...ALL_VIDEOS.map((v) => v.folder || "/"), "/"]),
@@ -2174,7 +1840,6 @@ function renderIncomingFolderOptions() {
 		incomingFolderOptions.appendChild(opt);
 	}
 }
-
 function renderIncomingTagOptions(incoming) {
 	incomingTagOptions.innerHTML = "";
 	const incomingHashes = new Set(incoming.map((v) => v.hash).filter(Boolean));
@@ -2199,7 +1864,6 @@ function renderIncomingTagOptions(incoming) {
 		incomingTagOptions.appendChild(row);
 	}
 }
-
 async function clearNewStatus(paths, all = false) {
 	const res = await fetch("/api/videos/new/clear", {
 		method: "POST",
@@ -2208,7 +1872,6 @@ async function clearNewStatus(paths, all = false) {
 	});
 	return res.ok;
 }
-
 async function forgetVideos(paths, hashes = [], all = false) {
 	const res = await fetch("/api/videos/new/forget", {
 		method: "POST",
@@ -2217,96 +1880,9 @@ async function forgetVideos(paths, hashes = [], all = false) {
 	});
 	return res.ok;
 }
-
-// upload modal
-const uploadModal = document.getElementById("upload-modal"),
-	dropZone = document.getElementById("drop-zone"),
-	uploadInput = document.getElementById("upload-input"),
-	uploadFolderSel = document.getElementById("upload-folder-select"),
-	newFolderInput = document.getElementById("new-folder-input"),
-	fileQueue = document.getElementById("file-queue"),
-	uploadSummary = document.getElementById("upload-summary"),
-	uploadStartBtn = document.getElementById("upload-start-btn"),
-	uploadCancelBtn = document.getElementById("upload-cancel-btn"),
-	uploadClose = document.getElementById("upload-close"),
-	openUploadBtn = document.getElementById("open-upload-btn");
-let uploadFiles = [];
-
-/** Rebuilds the destination folder <select> in the upload modal from the
- *  current ALL_FOLDERS / ALL_VIDEOS state, preserving the previous selection. */
-function populateUploadFolders() {
-	const folders = [
-		...new Set([
-			"/",
-			...ALL_FOLDERS,
-			...ALL_VIDEOS.map((v) => v.folder || "/"),
-		]),
-	].sort();
-	const prev = uploadFolderSel.value;
-	uploadFolderSel.innerHTML = "";
-	for (const f of folders) {
-		const o = document.createElement("option");
-		o.value = f;
-		o.textContent = f === "/" ? "Root (/)" : f;
-		uploadFolderSel.appendChild(o);
-	}
-	const no = document.createElement("option");
-	no.value = "__new__";
-	no.textContent = "+ new folder…";
-	uploadFolderSel.appendChild(no);
-	if (prev && [...uploadFolderSel.options].some((o) => o.value === prev))
-		uploadFolderSel.value = prev;
-}
-uploadFolderSel.addEventListener("change", () => {
-	if (uploadFolderSel.value === "__new__") {
-		newFolderInput.classList.add("visible");
-		newFolderInput.focus();
-	} else {
-		newFolderInput.classList.remove("visible");
-		newFolderInput.value = "";
-	}
-});
-openUploadBtn.addEventListener("click", () => {
-	uploadFiles = [];
-	renderFileQueue();
-	uploadModal.classList.add("open");
-});
 function closeUploadModal() {
 	uploadModal.classList.remove("open");
 }
-uploadClose.addEventListener("click", closeUploadModal);
-uploadCancelBtn.addEventListener("click", closeUploadModal);
-uploadModal.addEventListener("click", (e) => {
-	if (e.target === uploadModal) closeUploadModal();
-});
-dropZone.addEventListener("click", () => uploadInput.click());
-dropZone.addEventListener("dragover", (e) => {
-	e.preventDefault();
-	dropZone.classList.add("drag-active");
-});
-dropZone.addEventListener("dragleave", () =>
-	dropZone.classList.remove("drag-active"),
-);
-dropZone.addEventListener("drop", (e) => {
-	e.preventDefault();
-	dropZone.classList.remove("drag-active");
-	addFiles([...e.dataTransfer.files]);
-});
-uploadInput.addEventListener("change", () => {
-	addFiles([...uploadInput.files]);
-	uploadInput.value = "";
-});
-
-const ALLOWED_EXTS = new Set([
-	"webm",
-	"mp4",
-	"mpv",
-	"mkv",
-	"mov",
-	"avi",
-	"m4v",
-	"ogv",
-]);
 function addFiles(files) {
 	for (const f of files) {
 		const ext = f.name.split(".").pop().toLowerCase();
@@ -2320,7 +1896,6 @@ function addFiles(files) {
 	}
 	renderFileQueue();
 }
-/** Re-renders the file queue list inside the upload modal from uploadFiles. */
 function renderFileQueue() {
 	fileQueue.innerHTML = "";
 	for (const item of uploadFiles) {
@@ -2354,8 +1929,6 @@ function renderFileQueue() {
 	});
 	updateSummary();
 }
-/** Updates the upload summary line and enables/disables the Upload button
- *  based on the number of valid (non-error) files in uploadFiles. */
 function updateSummary() {
 	const valid = uploadFiles.filter((f) => f.status !== "error").length;
 	uploadSummary.textContent = uploadFiles.length
@@ -2368,12 +1941,6 @@ function updateSummary() {
 		: "";
 	uploadStartBtn.disabled = valid === 0;
 }
-/**
- * Updates the status badge of a queued upload item.
- * @param {string} id - The item's random id assigned in uploadFiles.
- * @param {'pending'|'uploading'|'done'|'error'} cls - CSS modifier class.
- * @param {string} text - Display text for the badge.
- */
 function setItemStatus(id, cls, text) {
 	const el = fileQueue.querySelector(
 		'[data-id="' + id + '"] .file-item-status',
@@ -2383,58 +1950,6 @@ function setItemStatus(id, cls, text) {
 		el.textContent = text;
 	}
 }
-uploadStartBtn.addEventListener("click", async () => {
-	let dest = uploadFolderSel.value;
-	if (dest === "__new__") dest = newFolderInput.value.trim() || "/";
-	const todo = uploadFiles.filter((f) => f.status === "pending");
-	uploadStartBtn.disabled = true;
-	for (const item of todo) {
-		setItemStatus(item.id, "uploading", "…");
-		const fd = new FormData();
-		fd.append("file", item.file);
-		fd.append("folder", dest);
-		try {
-			const res = await fetch("/api/upload", {
-				method: "POST",
-				body: fd,
-			});
-			const results = await res.json();
-			const r = results[0];
-			if (r && r.error) {
-				setItemStatus(item.id, "error", r.error);
-			} else {
-				setItemStatus(item.id, "done", "✓ done");
-				item.status = "done";
-				const guessedFolder =
-					dest && dest !== "/" && dest !== "__new__" ? dest : "/";
-				const extRaw = item.file.name.includes(".")
-					? "." + item.file.name.split(".").pop().toLowerCase()
-					: "";
-				upsertDownloadedVideo({
-					name: item.file.name,
-					path:
-						guessedFolder === "/"
-							? item.file.name
-							: guessedFolder + "/" + item.file.name,
-					folder: guessedFolder,
-					ext: extRaw,
-					size: item.file.size,
-					modified: new Date().toISOString(),
-					hash: "",
-					is_favorite: false,
-					tags: [],
-				});
-				refreshDerivedUI(false);
-			}
-		} catch (e) {
-			setItemStatus(item.id, "error", "failed");
-		}
-	}
-	await refresh();
-	uploadStartBtn.disabled = false;
-	toast("Upload complete", "success");
-});
-
 function resolveCollectionVideos(collection) {
 	const byHash = new Map();
 	for (const v of ALL_VIDEOS) {
@@ -2450,7 +1965,6 @@ function resolveCollectionVideos(collection) {
 	}
 	return { ordered, missing };
 }
-
 function openWatchCollection(collectionID) {
 	const collection = COLLECTION_MAP[collectionID];
 	if (!collection) return;
@@ -2511,7 +2025,6 @@ function openWatchCollection(collectionID) {
 	syncWatchCollectionControls();
 	watchCollectionModal.classList.add("open");
 }
-
 function closeWatchCollection() {
 	watchCollectionModal.classList.remove("open");
 	activeCollectionID = "";
@@ -2521,17 +2034,14 @@ function closeWatchCollection() {
 		v.src = "";
 	});
 }
-
 function getWatchCollectionVideos() {
 	return [...watchCollectionBody.querySelectorAll(".watch-grid video")];
 }
-
 function applyWatchGridClass(gridEl) {
 	if (!gridEl) return;
 	gridEl.classList.remove("cols-1", "cols-2", "cols-3", "cols-4");
 	gridEl.classList.add("cols-" + watchGridCols);
 }
-
 function syncWatchCollectionControls() {
 	if (watchCollectionVolumeInput) {
 		watchCollectionVolumeInput.value = String(watchCollectionMasterVolume);
@@ -2545,7 +2055,6 @@ function syncWatchCollectionControls() {
 			: "Mute all";
 	}
 }
-
 function applyWatchMasterAudioToAll() {
 	const videos = getWatchCollectionVideos();
 	for (const video of videos) {
@@ -2553,7 +2062,6 @@ function applyWatchMasterAudioToAll() {
 		video.muted = watchCollectionMasterMuted;
 	}
 }
-
 function openCollectionPicker(hashes) {
 	collectionPickerTargetHashes = hashes.filter(Boolean);
 	collectionPickerSelectedID = ALL_COLLECTIONS[0]?.id || "";
@@ -2565,14 +2073,11 @@ function openCollectionPicker(hashes) {
 	renderCollectionPickerOptions();
 	collectionPickerModal.classList.add("open");
 }
-
 function closeCollectionPicker() {
 	collectionPickerModal.classList.remove("open");
 	collectionPickerTargetHashes = [];
 	collectionPickerSelectedID = "";
 }
-
-let collectionPickerSelectedID = "";
 function renderCollectionPickerOptions() {
 	collectionPickerOptions.innerHTML = "";
 	for (const collection of ALL_COLLECTIONS) {
@@ -2593,30 +2098,6 @@ function renderCollectionPickerOptions() {
 		collectionPickerOptions.appendChild(option);
 	}
 }
-
-searchEl.addEventListener("input", render);
-sortSel.addEventListener("change", render);
-gridBtn.addEventListener("click", () => {
-	gallery.classList.remove("list-view");
-	gridBtn.classList.add("active");
-	listBtn.classList.remove("active");
-});
-listBtn.addEventListener("click", () => {
-	gallery.classList.add("list-view");
-	listBtn.classList.add("active");
-	gridBtn.classList.remove("active");
-});
-favoritesOnlyToggle.addEventListener("change", () => {
-	showFavoritesOnly = favoritesOnlyToggle.checked;
-	render();
-});
-
-// select mode
-/**
- * Toggles the selection state of a gallery card in select mode.
- * @param {string} path - Relative path of the video (used as the unique key).
- * @param {HTMLElement} card - The card DOM element to update visually.
- */
 function toggleSelect(path, card) {
 	if (selectedPaths.has(path)) {
 		selectedPaths.delete(path);
@@ -2627,13 +2108,11 @@ function toggleSelect(path, card) {
 	}
 	updateSelectBar();
 }
-/** Syncs the floating select bar's count label and visibility with selectedPaths. */
 function updateSelectBar() {
 	const n = selectedPaths.size;
 	selectCount.textContent = n + " selected";
 	selectBar.classList.toggle("visible", n > 0);
 }
-/** Exits select mode, clears all selections, and resets the select bar and button. */
 function exitSelectMode() {
 	selectMode = false;
 	document.body.classList.remove("select-mode");
@@ -2644,8 +2123,6 @@ function exitSelectMode() {
 		.forEach((c) => c.classList.remove("selected"));
 	selectBar.classList.remove("visible");
 }
-
-/** Clears in-memory video lists after lock so paths/metadata are dropped until unlock. */
 function unloadLibraryAfterPinLock() {
 	closeModal();
 	currentIdx = -1;
@@ -2656,78 +2133,10 @@ function unloadLibraryAfterPinLock() {
 	exitSelectMode();
 	refreshDerivedUI(false);
 }
-
-selectBtn.addEventListener("click", () => {
-	if (selectMode) {
-		exitSelectMode();
-	} else {
-		selectMode = true;
-		document.body.classList.add("select-mode");
-		selectBtn.classList.add("active");
-	}
-});
-selectMoveBtn.addEventListener("click", () => {
-	if (!selectedPaths.size) return;
-	const first =
-		filtered.find((v) => selectedPaths.has(v.path)) || filtered[0];
-	openMoveModal(first);
-});
-selectForgetBtn.addEventListener("click", async () => {
-	if (!selectedPaths.size) return;
-	const paths = [...selectedPaths];
-	const ok = await forgetVideos(paths, [], false);
-	if (!ok) {
-		toast("Forget operation failed", "error");
-		return;
-	}
-	await refresh();
-	exitSelectMode();
-	toast("Forgot " + paths.length + " file(s)", "success");
-});
-selectTagBtn.addEventListener("click", () => {
-	if (!selectedPaths.size) return;
-	const targets = filtered.filter((v) => selectedPaths.has(v.path));
-	if (!targets.length) return;
-	openTagModal(targets);
-});
-selectCollectionBtn.addEventListener("click", () => {
-	if (!selectedPaths.size) return;
-	const targets = filtered.filter((v) => selectedPaths.has(v.path));
-	const hashes = [...new Set(targets.map((v) => v.hash).filter(Boolean))];
-	if (!hashes.length) {
-		toast("No valid hashes found in selection", "error");
-		return;
-	}
-	openCollectionPicker(hashes);
-});
-selectAllBtn.addEventListener("click", () => {
-	filtered.forEach((v) => selectedPaths.add(v.path));
-	document.querySelectorAll(".card").forEach((c) => {
-		if (filtered.some((v) => v.path === c.dataset.path))
-			c.classList.add("selected");
-	});
-	updateSelectBar();
-});
-selectClearBtn.addEventListener("click", () => {
-	selectedPaths.clear();
-	document
-		.querySelectorAll(".card.selected")
-		.forEach((c) => c.classList.remove("selected"));
-	updateSelectBar();
-});
-
-// tags (sidebar)
-newTagBtn.addEventListener("click", () => {
-	tagsSection.classList.remove("collapsed");
-	sidebarTagForm.classList.add("visible");
-	sidebarTagInput.value = "";
-	sidebarTagInput.focus();
-});
 function hideSidebarTagForm() {
 	sidebarTagForm.classList.remove("visible");
 	sidebarTagInput.value = "";
 }
-sidebarTagCancel.addEventListener("click", hideSidebarTagForm);
 async function createSidebarTag() {
 	const name = sidebarTagInput.value.trim();
 	if (!name) return;
@@ -2745,24 +2154,10 @@ async function createSidebarTag() {
 		await refresh();
 	}
 }
-sidebarTagConfirm.addEventListener("click", createSidebarTag);
-sidebarTagInput.addEventListener("keydown", (e) => {
-	if (e.key === "Enter") createSidebarTag();
-	if (e.key === "Escape") hideSidebarTagForm();
-});
-
-// collections (sidebar)
-newCollectionBtn.addEventListener("click", () => {
-	collectionsSection.classList.remove("collapsed");
-	sidebarCollectionForm.classList.add("visible");
-	sidebarCollectionInput.value = "";
-	sidebarCollectionInput.focus();
-});
 function hideSidebarCollectionForm() {
 	sidebarCollectionForm.classList.remove("visible");
 	sidebarCollectionInput.value = "";
 }
-sidebarCollectionCancel.addEventListener("click", hideSidebarCollectionForm);
 async function createSidebarCollection() {
 	const name = sidebarCollectionInput.value.trim();
 	if (!name) return;
@@ -2780,37 +2175,10 @@ async function createSidebarCollection() {
 		await refresh();
 	}
 }
-sidebarCollectionConfirm.addEventListener("click", createSidebarCollection);
-sidebarCollectionInput.addEventListener("keydown", (e) => {
-	if (e.key === "Enter") createSidebarCollection();
-	if (e.key === "Escape") hideSidebarCollectionForm();
-});
-
-tagsCollapseBtn.addEventListener("click", () => {
-	tagsSection.classList.toggle("collapsed");
-});
-collectionsCollapseBtn.addEventListener("click", () => {
-	collectionsSection.classList.toggle("collapsed");
-});
-foldersCollapseBtn.addEventListener("click", () => {
-	foldersSection.classList.toggle("collapsed");
-});
-
-// new folder (sidebar)
-newFolderBtn.addEventListener("click", () => {
-	foldersSection.classList.remove("collapsed");
-	sidebarFolderForm.classList.add("visible");
-	sidebarFolderInput.value = "";
-	sidebarFolderInput.focus();
-});
-/** Hides the inline new-folder input in the sidebar and clears its value. */
 function hideSidebarFolderForm() {
 	sidebarFolderForm.classList.remove("visible");
 	sidebarFolderInput.value = "";
 }
-sidebarFolderCancel.addEventListener("click", hideSidebarFolderForm);
-/** Reads the sidebar folder input, POSTs to /api/mkdir, then updates folder
- *  nav (no full video rescan). Shows a toast on success or failure. */
 async function createFolder() {
 	const name = sidebarFolderInput.value.trim();
 	if (!name) return;
@@ -2834,17 +2202,6 @@ async function createFolder() {
 		toast("Failed: " + (await res.text()), "error");
 	}
 }
-sidebarFolderConfirm.addEventListener("click", createFolder);
-sidebarFolderInput.addEventListener("keydown", (e) => {
-	if (e.key === "Enter") createFolder();
-	if (e.key === "Escape") hideSidebarFolderForm();
-});
-
-/**
- * Displays a transient notification at the bottom-right of the screen.
- * @param {string} msg - Message text to display.
- * @param {'success'|'error'|''} type - CSS modifier applied to the toast element.
- */
 function toast(msg, type = "") {
 	const el = document.createElement("div");
 	el.className = "toast " + type;
@@ -2852,7 +2209,6 @@ function toast(msg, type = "") {
 	document.body.appendChild(el);
 	setTimeout(() => el.remove(), 3000);
 }
-
 async function deleteVideoPath(path) {
 	try {
 		const res = await fetch("/api/delete", {
@@ -2866,7 +2222,6 @@ async function deleteVideoPath(path) {
 		return { ok: false, message: "request failed" };
 	}
 }
-
 async function renameVideoPath(path, name) {
 	try {
 		const res = await fetch("/api/rename", {
@@ -2880,7 +2235,6 @@ async function renameVideoPath(path, name) {
 		return { ok: false, message: "request failed" };
 	}
 }
-
 async function setFavorite(hash, favorite) {
 	if (!hash) return false;
 	try {
@@ -2894,7 +2248,6 @@ async function setFavorite(hash, favorite) {
 		return false;
 	}
 }
-
 async function createTag(name) {
 	try {
 		const res = await fetch("/api/tags/create", {
@@ -2908,7 +2261,6 @@ async function createTag(name) {
 		return null;
 	}
 }
-
 async function deleteTag(tagID) {
 	try {
 		const res = await fetch("/api/tags/delete", {
@@ -2921,7 +2273,6 @@ async function deleteTag(tagID) {
 		return false;
 	}
 }
-
 async function setTagAssignment(hash, tagID, assigned) {
 	try {
 		const res = await fetch("/api/tags/assign", {
@@ -2934,7 +2285,6 @@ async function setTagAssignment(hash, tagID, assigned) {
 		return false;
 	}
 }
-
 async function setTagAssignmentsBulk(hashes, tagID, assigned) {
 	try {
 		const uniqueHashes = [...new Set((hashes || []).filter(Boolean))];
@@ -2953,7 +2303,6 @@ async function setTagAssignmentsBulk(hashes, tagID, assigned) {
 		return false;
 	}
 }
-
 async function createCollection(name) {
 	try {
 		const res = await fetch("/api/collections/create", {
@@ -2967,7 +2316,6 @@ async function createCollection(name) {
 		return null;
 	}
 }
-
 async function renameCollection(id, name) {
 	try {
 		const res = await fetch("/api/collections/rename", {
@@ -2980,7 +2328,6 @@ async function renameCollection(id, name) {
 		return false;
 	}
 }
-
 async function deleteCollection(id) {
 	try {
 		const res = await fetch("/api/collections/delete", {
@@ -2993,7 +2340,6 @@ async function deleteCollection(id) {
 		return false;
 	}
 }
-
 async function setCollectionVideo(id, hash, assigned) {
 	try {
 		const res = await fetch("/api/collections/videos/set", {
@@ -3006,7 +2352,6 @@ async function setCollectionVideo(id, hash, assigned) {
 		return false;
 	}
 }
-
 async function bulkAddCollectionVideos(id, hashes) {
 	try {
 		const res = await fetch("/api/collections/videos/bulk", {
@@ -3019,7 +2364,6 @@ async function bulkAddCollectionVideos(id, hashes) {
 		return false;
 	}
 }
-
 async function createCollectionFromFolder(folder, name) {
 	try {
 		const res = await fetch("/api/collections/from-folder", {
@@ -3035,7 +2379,6 @@ async function createCollectionFromFolder(folder, name) {
 		return { ok: false, error: "request failed" };
 	}
 }
-
 async function resolveDuplicateGroup(hash) {
 	const group = DUPLICATE_GROUPS.find((g) => g.hash === hash);
 	if (!group || group.members.length < 2) return;
@@ -3061,7 +2404,6 @@ async function resolveDuplicateGroup(hash) {
 	if (fail) toast(fail + " duplicate delete(s) failed", "error");
 	else toast("Duplicate group resolved", "success");
 }
-
 async function resolveAllDuplicateGroups() {
 	const actions = DUPLICATE_GROUPS.map((g) => ({
 		hash: g.hash,
@@ -3089,311 +2431,1287 @@ async function resolveAllDuplicateGroups() {
 	if (fail) toast(fail + " duplicate delete(s) failed", "error");
 	else toast("All duplicate groups resolved", "success");
 }
+function initDomRefs() {
+	gallery = document.getElementById("gallery") as typeof gallery;
+	pinLockBtn = document.getElementById("pin-lock-btn") as typeof pinLockBtn;
+	folderList = document.getElementById("folder-list") as typeof folderList;
+	incomingList = document.getElementById("incoming-list") as typeof incomingList;
+	tagList = document.getElementById("tag-list") as typeof tagList;
+	searchEl = document.getElementById("search") as typeof searchEl;
+	statsEl = document.getElementById("stats") as typeof statsEl;
+	sortSel = document.getElementById("sort-select") as typeof sortSel;
+	gridBtn = document.getElementById("grid-btn") as typeof gridBtn;
+	listBtn = document.getElementById("list-btn") as typeof listBtn;
+	favoritesOnlyToggle = document.getElementById("favorites-only-toggle") as typeof favoritesOnlyToggle;
+	modal = document.getElementById("modal") as typeof modal;
+	modalVid = document.getElementById("modal-video") as typeof modalVid;
+	modalTitle = document.getElementById("modal-title") as typeof modalTitle;
+	modalPath = document.getElementById("modal-path") as typeof modalPath;
+	prevBtn = document.getElementById("prev-btn") as typeof prevBtn;
+	nextBtn = document.getElementById("next-btn") as typeof nextBtn;
+	closeBtn = document.getElementById("close-btn") as typeof closeBtn;
+	selectBtn = document.getElementById("select-btn") as typeof selectBtn;
+	selectBar = document.getElementById("select-bar") as typeof selectBar;
+	selectCount = document.getElementById("select-count") as typeof selectCount;
+	selectTagBtn = document.getElementById("select-tag-btn") as typeof selectTagBtn;
+	selectMoveBtn = document.getElementById("select-move-btn") as typeof selectMoveBtn;
+	selectForgetBtn = document.getElementById("select-forget-btn") as typeof selectForgetBtn;
+	selectAllBtn = document.getElementById("select-all-btn") as typeof selectAllBtn;
+	selectClearBtn = document.getElementById("select-clear-btn") as typeof selectClearBtn;
+	newFolderBtn = document.getElementById("new-folder-btn") as typeof newFolderBtn;
+	sidebarFolderForm = document.getElementById("sidebar-folder-form") as typeof sidebarFolderForm;
+	sidebarFolderInput = document.getElementById("sidebar-folder-input") as typeof sidebarFolderInput;
+	sidebarFolderConfirm = document.getElementById("sidebar-folder-confirm") as typeof sidebarFolderConfirm;
+	sidebarFolderCancel = document.getElementById("sidebar-folder-cancel") as typeof sidebarFolderCancel;
+	newTagBtn = document.getElementById("new-tag-btn") as typeof newTagBtn;
+	sidebarTagForm = document.getElementById("sidebar-tag-form") as typeof sidebarTagForm;
+	sidebarTagInput = document.getElementById("sidebar-tag-input") as typeof sidebarTagInput;
+	sidebarTagConfirm = document.getElementById("sidebar-tag-confirm") as typeof sidebarTagConfirm;
+	sidebarTagCancel = document.getElementById("sidebar-tag-cancel") as typeof sidebarTagCancel;
+	newCollectionBtn = document.getElementById("new-collection-btn") as typeof newCollectionBtn;
+	sidebarCollectionForm = document.getElementById("sidebar-collection-form") as typeof sidebarCollectionForm;
+	sidebarCollectionInput = document.getElementById("sidebar-collection-input") as typeof sidebarCollectionInput;
+	sidebarCollectionConfirm = document.getElementById("sidebar-collection-confirm") as typeof sidebarCollectionConfirm;
+	sidebarCollectionCancel = document.getElementById("sidebar-collection-cancel") as typeof sidebarCollectionCancel;
+	collectionList = document.getElementById("collection-list") as typeof collectionList;
+	collectionsCollapseBtn = document.getElementById("collections-collapse-btn") as typeof collectionsCollapseBtn;
+	tagsCollapseBtn = document.getElementById("tags-collapse-btn") as typeof tagsCollapseBtn;
+	foldersCollapseBtn = document.getElementById("folders-collapse-btn") as typeof foldersCollapseBtn;
+	dupBanner = document.getElementById("dup-banner") as typeof dupBanner;
+	dupBannerText = document.getElementById("dup-banner-text") as typeof dupBannerText;
+	dupReviewBtn = document.getElementById("dup-review-btn") as typeof dupReviewBtn;
+	dupDismissBtn = document.getElementById("dup-dismiss-btn") as typeof dupDismissBtn;
+	dupModal = document.getElementById("dup-modal") as typeof dupModal;
+	dupSubtitle = document.getElementById("dup-subtitle") as typeof dupSubtitle;
+	dupGroupsEl = document.getElementById("dup-groups") as typeof dupGroupsEl;
+	dupClose = document.getElementById("dup-close") as typeof dupClose;
+	dupCancelBtn = document.getElementById("dup-cancel-btn") as typeof dupCancelBtn;
+	dupResolveAllBtn = document.getElementById("dup-resolve-all-btn") as typeof dupResolveAllBtn;
+	incomingBanner = document.getElementById("incoming-banner") as typeof incomingBanner;
+	incomingBannerText = document.getElementById("incoming-banner-text") as typeof incomingBannerText;
+	incomingReviewBtn = document.getElementById("incoming-review-btn") as typeof incomingReviewBtn;
+	incomingMassSortBtn = document.getElementById("incoming-mass-sort-btn") as typeof incomingMassSortBtn;
+	incomingDismissBtn = document.getElementById("incoming-dismiss-btn") as typeof incomingDismissBtn;
+	incomingMarkAllBtn = document.getElementById("incoming-mark-all-btn") as typeof incomingMarkAllBtn;
+	incomingSidebarSection = document.getElementById("incoming-sidebar-section") as typeof incomingSidebarSection;
+	incomingModal = document.getElementById("incoming-modal") as typeof incomingModal;
+	incomingSubtitle = document.getElementById("incoming-subtitle") as typeof incomingSubtitle;
+	incomingTagOptions = document.getElementById("incoming-tag-options") as typeof incomingTagOptions;
+	incomingFolderOptions = document.getElementById("incoming-folder-options") as typeof incomingFolderOptions;
+	incomingClose = document.getElementById("incoming-close") as typeof incomingClose;
+	incomingCancelBtn = document.getElementById("incoming-cancel-btn") as typeof incomingCancelBtn;
+	incomingConfirmBtn = document.getElementById("incoming-confirm-btn") as typeof incomingConfirmBtn;
+	incomingMarkReviewedBtn = document.getElementById("incoming-mark-reviewed-btn") as typeof incomingMarkReviewedBtn;
+	tagModal = document.getElementById("tag-modal") as typeof tagModal;
+	tagSubtitle = document.getElementById("tag-subtitle") as typeof tagSubtitle;
+	tagOptions = document.getElementById("tag-options") as typeof tagOptions;
+	tagPendingSummary = document.getElementById("tag-pending-summary") as typeof tagPendingSummary;
+	tagClose = document.getElementById("tag-close") as typeof tagClose;
+	tagApplyBtn = document.getElementById("tag-apply-btn") as typeof tagApplyBtn;
+	tagCancelBtn = document.getElementById("tag-cancel-btn") as typeof tagCancelBtn;
+	tagNewInput = document.getElementById("tag-new-input") as typeof tagNewInput;
+	tagNewBtn = document.getElementById("tag-new-btn") as typeof tagNewBtn;
+	selectCollectionBtn = document.getElementById("select-collection-btn") as typeof selectCollectionBtn;
+	collectionPickerModal = document.getElementById("collection-picker-modal") as typeof collectionPickerModal;
+	collectionPickerSubtitle = document.getElementById("collection-picker-subtitle") as typeof collectionPickerSubtitle;
+	collectionPickerOptions = document.getElementById("collection-picker-options") as typeof collectionPickerOptions;
+	collectionPickerClose = document.getElementById("collection-picker-close") as typeof collectionPickerClose;
+	collectionPickerCancelBtn = document.getElementById("collection-picker-cancel-btn") as typeof collectionPickerCancelBtn;
+	collectionPickerConfirmBtn = document.getElementById("collection-picker-confirm-btn") as typeof collectionPickerConfirmBtn;
+	collectionPickerNewInput = document.getElementById("collection-picker-new-input") as typeof collectionPickerNewInput;
+	collectionPickerNewBtn = document.getElementById("collection-picker-new-btn") as typeof collectionPickerNewBtn;
+	watchCollectionModal = document.getElementById("watch-collection-modal") as typeof watchCollectionModal;
+	watchCollectionTitle = document.getElementById("watch-collection-title") as typeof watchCollectionTitle;
+	watchCollectionSubtitle = document.getElementById("watch-collection-subtitle") as typeof watchCollectionSubtitle;
+	watchCollectionBody = document.getElementById("watch-collection-body") as typeof watchCollectionBody;
+	watchCollectionClose = document.getElementById("watch-collection-close") as typeof watchCollectionClose;
+	watchCollectionDeleteBtn = document.getElementById("watch-collection-delete-btn") as typeof watchCollectionDeleteBtn;
+	watchCollectionRenameBtn = document.getElementById("watch-collection-rename-btn") as typeof watchCollectionRenameBtn;
+	watchCollectionPlayAllBtn = document.getElementById("watch-collection-play-all-btn") as typeof watchCollectionPlayAllBtn;
+	watchCollectionPauseAllBtn = document.getElementById("watch-collection-pause-all-btn") as typeof watchCollectionPauseAllBtn;
+	watchCollectionMuteAllBtn = document.getElementById("watch-collection-mute-all-btn") as typeof watchCollectionMuteAllBtn;
+	watchCollectionVolumeInput = document.getElementById("watch-collection-volume-input") as typeof watchCollectionVolumeInput;
+	watchCollectionGridCols = document.getElementById("watch-collection-grid-cols") as typeof watchCollectionGridCols;
+	previewSettingsModal = document.getElementById("preview-settings-modal") as typeof previewSettingsModal;
+	previewSettingsClose = document.getElementById("preview-settings-close") as typeof previewSettingsClose;
+	previewSettingsLauncher = document.getElementById("preview-settings-launcher") as typeof previewSettingsLauncher;
+	previewSettingsAudioToggleBtn = document.getElementById("preview-settings-audio-toggle") as typeof previewSettingsAudioToggleBtn;
+	previewSettingsVolumeInput = document.getElementById("preview-settings-volume") as typeof previewSettingsVolumeInput;
+	pinGateOverlay = document.getElementById("pin-gate-overlay") as typeof pinGateOverlay;
+	pinGateForm = document.getElementById("pin-gate-form") as typeof pinGateForm;
+	pinGateInput = document.getElementById("pin-gate-input") as typeof pinGateInput;
+	pinGateError = document.getElementById("pin-gate-error") as typeof pinGateError;
+	ctxMenu = document.getElementById("ctx-menu") as typeof ctxMenu;
+	ctxTagsEl = document.getElementById("ctx-tags") as typeof ctxTagsEl;
+	ctxMoveEl = document.getElementById("ctx-move") as typeof ctxMoveEl;
+	ctxRenameEl = document.getElementById("ctx-rename") as typeof ctxRenameEl;
+	ctxDeleteEl = document.getElementById("ctx-delete") as typeof ctxDeleteEl;
+	ctxForgetEl = document.getElementById("ctx-forget") as typeof ctxForgetEl;
+	moveModal = document.getElementById("move-modal") as typeof moveModal;
+	moveSubtitle = document.getElementById("move-subtitle") as typeof moveSubtitle;
+	folderOptions = document.getElementById("folder-options") as typeof folderOptions;
+	newFolderName = document.getElementById("new-folder-name") as typeof newFolderName;
+	addFolderBtn = document.getElementById("add-folder-btn") as typeof addFolderBtn;
+	moveCancelBtn = document.getElementById("move-cancel-btn") as typeof moveCancelBtn;
+	moveConfirmBtn = document.getElementById("move-confirm-btn") as typeof moveConfirmBtn;
+	moveClose = document.getElementById("move-close") as typeof moveClose;
+	uploadModal = document.getElementById("upload-modal") as typeof uploadModal;
+	dropZone = document.getElementById("drop-zone") as typeof dropZone;
+	uploadInput = document.getElementById("upload-input") as typeof uploadInput;
+	uploadFolderSel = document.getElementById("upload-folder-select") as typeof uploadFolderSel;
+	newFolderInput = document.getElementById("new-folder-input") as typeof newFolderInput;
+	fileQueue = document.getElementById("file-queue") as typeof fileQueue;
+	uploadSummary = document.getElementById("upload-summary") as typeof uploadSummary;
+	uploadStartBtn = document.getElementById("upload-start-btn") as typeof uploadStartBtn;
+	uploadCancelBtn = document.getElementById("upload-cancel-btn") as typeof uploadCancelBtn;
+	uploadClose = document.getElementById("upload-close") as typeof uploadClose;
+	openUploadBtn = document.getElementById("open-upload-btn") as typeof openUploadBtn;
+	pinLockBtn = document.getElementById("pin-lock-btn");
+	if (tagsCollapseBtn) tagsSection = tagsCollapseBtn.closest(".sidebar-section");
+	if (foldersCollapseBtn) foldersSection = foldersCollapseBtn.closest(".sidebar-section");
+	if (collectionsCollapseBtn) collectionsSection = collectionsCollapseBtn.closest(".sidebar-section");
+}
 
-dupReviewBtn.addEventListener("click", openDuplicateModal);
-dupDismissBtn.addEventListener("click", () => {
-	duplicateBannerDismissed = true;
-	dupBanner.classList.remove("visible");
-});
-dupClose.addEventListener("click", closeDuplicateModal);
-dupCancelBtn.addEventListener("click", closeDuplicateModal);
-dupModal.addEventListener("click", (e) => {
-	if (e.target === dupModal) closeDuplicateModal();
-});
-dupResolveAllBtn.addEventListener("click", resolveAllDuplicateGroups);
+function wireAppEvents() {
 
-incomingReviewBtn.addEventListener("click", () => {
-	activeIncomingFilter = true;
-	activeFolder = "__all__";
-	buildIncomingNav();
-	buildFolderNav();
-	render();
-});
-incomingMassSortBtn.addEventListener("click", openIncomingModal);
-incomingDismissBtn.addEventListener("click", () => {
-	incomingBannerDismissed = true;
-	incomingBanner.classList.remove("visible");
-});
-incomingClose.addEventListener("click", closeIncomingModal);
-incomingCancelBtn.addEventListener("click", closeIncomingModal);
-incomingModal.addEventListener("click", (e) => {
-	if (e.target === incomingModal) closeIncomingModal();
-});
-incomingMarkAllBtn.addEventListener("click", async () => {
-	const incomingPaths = ALL_VIDEOS.filter((v) => Boolean(v.is_new)).map((v) => v.path);
-	if (!incomingPaths.length) return;
-	const ok = await clearNewStatus(incomingPaths, false);
-	if (!ok) {
-		toast("Failed to mark incoming files as reviewed", "error");
-		return;
-	}
-	await refresh();
-	toast("Marked all incoming as reviewed", "success");
-});
-incomingMarkReviewedBtn.addEventListener("click", async () => {
-	const incoming = ALL_VIDEOS.filter((v) => Boolean(v.is_new)).map((v) => v.path);
-	if (!incoming.length) {
-		closeIncomingModal();
-		return;
-	}
-	const ok = await clearNewStatus(incoming, true);
-	if (!ok) {
-		toast("Failed to mark incoming files as reviewed", "error");
-		return;
-	}
-	closeIncomingModal();
-	await refresh();
-});
-incomingConfirmBtn.addEventListener("click", async () => {
-	const incoming = ALL_VIDEOS.filter((v) => Boolean(v.is_new));
-	if (!incoming.length) {
-		closeIncomingModal();
-		return;
-	}
-	let errs = 0;
-	const reviewedPaths = [];
-	for (const video of incoming) {
-		if ((video.folder || "/") === incomingSelectedFolder) {
-			reviewedPaths.push(video.path);
-			continue;
+	closeBtn.addEventListener("click", closeModal);
+	modal.addEventListener("click", (e) => {
+		if (e.target === modal) closeModal();
+	});
+	prevBtn.addEventListener("click", () => {
+		if (currentIdx > 0) openModal(currentIdx - 1);
+	});
+	nextBtn.addEventListener("click", () => {
+		if (currentIdx < filtered.length - 1) openModal(currentIdx + 1);
+	});
+	modalVid.addEventListener("ended", () => {
+		if (currentIdx < filtered.length - 1) openModal(currentIdx + 1);
+	});
+	document.addEventListener("keydown", (e) => {
+		if (
+			e.key === "Escape" &&
+			previewSettingsModal &&
+			previewSettingsModal.classList.contains("open")
+		) {
+			closePreviewSettings();
+			return;
 		}
-		const res = await fetch("/api/move", {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				path: video.path,
-				dest_folder: incomingSelectedFolder,
-			}),
-		});
-		if (!res.ok) errs++;
-		else reviewedPaths.push(video.path);
-	}
-	const incomingHashes = [...new Set(incoming.map((v) => v.hash).filter(Boolean))];
-	let tagErrs = 0;
-	if (incomingSelectedTagIDs.size && incomingHashes.length) {
-		for (const tagID of incomingSelectedTagIDs) {
-			const ok = await setTagAssignmentsBulk(incomingHashes, tagID, true);
-			if (!ok) tagErrs++;
+		if (!modal.classList.contains("open")) return;
+		if (e.key === "Escape") closeModal();
+		if (e.key === "ArrowLeft") prevBtn.click();
+		if (e.key === "ArrowRight") nextBtn.click();
+	});
+	
+	// context menu
+	
+	document.addEventListener("click", () => ctxMenu.classList.remove("open"));
+	ctxTagsEl.addEventListener("click", () => {
+		if (ctxVideo) openTagModal(ctxVideo);
+	});
+	ctxMoveEl.addEventListener("click", () => {
+		if (ctxVideo) openMoveModal(ctxVideo);
+	});
+	ctxRenameEl.addEventListener("click", async () => {
+		if (!ctxVideo) return;
+		const next = prompt("Rename file (new base name)", ctxVideo.name);
+		if (next == null) return;
+		const trimmed = next.trim();
+		if (!trimmed) return;
+		const res = await renameVideoPath(ctxVideo.path, trimmed);
+		if (res.ok) {
+			toast("Renamed file", "success");
+			await refresh();
+		} else {
+			toast("Rename failed: " + res.message, "error");
 		}
-	}
-	const ok = await clearNewStatus(reviewedPaths, false);
-	if (!ok) {
-		toast("Moves completed but clear status failed", "error");
-	}
-	if (ok && !errs && !tagErrs) {
-		activeIncomingFilter = false;
-	}
-	closeIncomingModal();
-	await refresh();
-	if (errs || tagErrs) {
-		toast(
-			(errs ? errs + " move(s) failed. " : "") +
-				(tagErrs ? tagErrs + " tag update(s) failed." : ""),
-			"error",
-		);
-	} else {
-		toast("Incoming media mass sorted", "success");
-	}
-});
-
-collectionPickerClose.addEventListener("click", closeCollectionPicker);
-collectionPickerCancelBtn.addEventListener("click", closeCollectionPicker);
-collectionPickerModal.addEventListener("click", (e) => {
-	if (e.target === collectionPickerModal) closeCollectionPicker();
-});
-collectionPickerNewBtn.addEventListener("click", async () => {
-	const name = collectionPickerNewInput.value.trim();
-	if (!name) return;
-	const created = await createCollection(name);
-	if (!created) {
-		toast("Create collection failed", "error");
-		return;
-	}
-	collectionPickerNewInput.value = "";
-	try {
-		await refreshCollectionsOnly();
-		buildCollectionNav();
-	} catch (e) {
+	});
+	ctxForgetEl.addEventListener("click", async () => {
+		if (!ctxVideo) return;
+		const ok = await forgetVideos([ctxVideo.path], [], false);
+		if (!ok) {
+			toast("Failed to forget file", "error");
+			return;
+		}
+		toast("File forgotten and re-queued", "success");
 		await refresh();
-	}
-	collectionPickerSelectedID = created.id;
-	renderCollectionPickerOptions();
-});
-collectionPickerNewInput.addEventListener("keydown", (e) => {
-	if (e.key === "Enter") collectionPickerNewBtn.click();
-});
-collectionPickerConfirmBtn.addEventListener("click", async () => {
-	if (!collectionPickerSelectedID || !collectionPickerTargetHashes.length)
-		return;
-	const collectionId = collectionPickerSelectedID;
-	const ok = await bulkAddCollectionVideos(
-		collectionId,
-		collectionPickerTargetHashes,
-	);
-	if (!ok) {
-		toast("Add to collection failed", "error");
-		return;
-	}
-	try {
-		await refreshCollectionsOnly();
-		buildCollectionNav();
-		if (activeCollectionID === collectionId) openWatchCollection(collectionId);
-	} catch (e) {
-		await refresh();
-	}
-	closeCollectionPicker();
-	if (selectMode) exitSelectMode();
-	toast("Added to collection", "success");
-});
-
-watchCollectionClose.addEventListener("click", closeWatchCollection);
-watchCollectionPlayAllBtn.addEventListener("click", () => {
-	const videos = getWatchCollectionVideos();
-	for (const video of videos) {
-		video.play().catch(() => {});
-	}
-});
-watchCollectionPauseAllBtn.addEventListener("click", () => {
-	const videos = getWatchCollectionVideos();
-	for (const video of videos) {
-		video.pause();
-	}
-});
-watchCollectionMuteAllBtn.addEventListener("click", () => {
-	watchCollectionMasterMuted = !watchCollectionMasterMuted;
-	persistStorageValue(WATCH_GRID_MUTED_STORAGE_KEY, watchCollectionMasterMuted);
-	applyWatchMasterAudioToAll();
-	syncWatchCollectionControls();
-});
-watchCollectionVolumeInput.addEventListener("input", () => {
-	watchCollectionMasterVolume = Math.max(
-		0,
-		Math.min(1, Number(watchCollectionVolumeInput.value) || 0),
-	);
-	persistStorageValue(WATCH_GRID_VOLUME_STORAGE_KEY, watchCollectionMasterVolume);
-	applyWatchMasterAudioToAll();
-});
-watchCollectionGridCols.addEventListener("change", () => {
-	watchGridCols = Math.max(
-		1,
-		Math.min(4, Number(watchCollectionGridCols.value) || 4),
-	);
-	persistStorageValue(WATCH_GRID_COLS_STORAGE_KEY, watchGridCols);
-	const grid = watchCollectionBody.querySelector(".watch-grid");
-	applyWatchGridClass(grid);
-	syncWatchCollectionControls();
-});
-watchCollectionModal.addEventListener("click", (e) => {
-	if (e.target === watchCollectionModal) closeWatchCollection();
-});
-watchCollectionDeleteBtn.addEventListener("click", async () => {
-	if (!activeCollectionID) return;
-	const c = COLLECTION_MAP[activeCollectionID];
-	if (!c) return;
-	if (!confirm('Delete collection "' + c.name + '"?')) return;
-	const ok = await deleteCollection(activeCollectionID);
-	if (!ok) {
-		toast("Collection delete failed", "error");
-		return;
-	}
-	closeWatchCollection();
-	await refresh();
-});
-watchCollectionRenameBtn.addEventListener("click", async () => {
-	if (!activeCollectionID) return;
-	const c = COLLECTION_MAP[activeCollectionID];
-	if (!c) return;
-	const nextName = prompt("Rename collection", c.name);
-	if (!nextName || !nextName.trim()) return;
-	const ok = await renameCollection(activeCollectionID, nextName.trim());
-	if (!ok) {
-		toast("Collection rename failed", "error");
-		return;
-	}
-	await refresh();
-	openWatchCollection(activeCollectionID);
-});
-
-if (previewSettingsLauncher) {
-	previewSettingsLauncher.addEventListener("click", () => {
-		openPreviewSettings();
 	});
-}
-if (previewSettingsClose) {
-	previewSettingsClose.addEventListener("click", () => {
-		closePreviewSettings();
-	});
-}
-if (previewSettingsModal) {
-	previewSettingsModal.addEventListener("click", (e) => {
-		if (e.target === previewSettingsModal) closePreviewSettings();
-	});
-}
-if (previewSettingsAudioToggleBtn) {
-	previewSettingsAudioToggleBtn.addEventListener("click", () => {
-		toggleHoverPreviewAudio();
-	});
-}
-if (previewSettingsVolumeInput) {
-	previewSettingsVolumeInput.addEventListener("input", () => {
-		hoverPreviewVolume = Math.max(
-			0,
-			Math.min(1, Number(previewSettingsVolumeInput.value) || 0),
+	ctxDeleteEl.addEventListener("click", async () => {
+		if (!ctxVideo) return;
+		const ok = confirm(
+			'Delete "' +
+				ctxVideo.name +
+				'"?\n\nThis removes the file from disk and cannot be undone.',
 		);
-		persistStorageValue(HOVER_PREVIEW_VOLUME_KEY, hoverPreviewVolume);
-		applyHoverPreviewAudioToAll();
-	});
-}
-
-if (pinGateForm) {
-	pinGateForm.addEventListener("submit", async (e) => {
-		e.preventDefault();
-		const pin = (pinGateInput && pinGateInput.value) || "";
-		if (pinGateError) {
-			pinGateError.hidden = true;
-			pinGateError.textContent = "";
+		if (!ok) return;
+		const res = await deleteVideoPath(ctxVideo.path);
+		if (res.ok) {
+			toast("Deleted " + ctxVideo.name, "success");
+			await refresh();
+		} else {
+			toast("Delete failed: " + res.message, "error");
 		}
+	});
+
+	tagNewBtn.addEventListener("click", async () => {
+		const name = tagNewInput.value.trim();
+		if (!name) return;
+		const created = await createTag(name);
+		if (!created) {
+			toast("Tag create failed", "error");
+			return;
+		}
+		tagNewInput.value = "";
 		try {
-			const res = await fetch("/api/auth/pin", {
+			await refreshTagsOnly();
+			buildTagNav();
+		} catch (e) {
+			await refresh();
+		}
+		renderTagOptions();
+	});
+	tagNewInput.addEventListener("keydown", (e) => {
+		if (e.key === "Enter") tagNewBtn.click();
+	});
+	tagClose.addEventListener("click", closeTagModal);
+	tagApplyBtn.addEventListener("click", async () => {
+		const entries = getPendingTagActionEntries();
+		if (!entries.length) return;
+		const liveTargets = resolveTagTargets();
+		const hashes = [...new Set(liveTargets.map((v) => v.hash).filter(Boolean))];
+		if (!hashes.length) {
+			toast("No taggable videos selected", "error");
+			return;
+		}
+	
+		const addingNames = entries
+			.filter(([, action]) => action === "add")
+			.map(([tagID]) => TAG_MAP[tagID]?.name || tagID);
+		const removingNames = entries
+			.filter(([, action]) => action === "remove")
+			.map(([tagID]) => TAG_MAP[tagID]?.name || tagID);
+		const confirmLines = [
+			"Apply tag changes to " + hashes.length + " videos?",
+		];
+		if (addingNames.length) confirmLines.push("Add: " + addingNames.join(", "));
+		if (removingNames.length)
+			confirmLines.push("Remove: " + removingNames.join(", "));
+		if (!confirm(confirmLines.join("\n"))) return;
+	
+		recomputeFiltered();
+		const prevFilteredPaths = filtered.map((v) => v.path);
+	
+		let failures = 0;
+		for (const [tagID, action] of entries) {
+			const ok = await setTagAssignmentsBulk(hashes, tagID, action === "add");
+			if (!ok) failures++;
+		}
+		if (failures) {
+			toast(failures + " tag update(s) failed", "error");
+			await refresh();
+			renderTagOptions();
+			return;
+		}
+	
+		try {
+			await refreshTagsOnly();
+			await refreshTagAssignmentsForHashes(hashes);
+			refreshAfterTagDataChange(prevFilteredPaths, hashes);
+		} catch (e) {
+			await refresh();
+		}
+		pendingTagActions = new Map();
+		renderTagOptions();
+		toast("Tag changes applied", "success");
+		if (selectMode) {
+			closeTagModal();
+			exitSelectMode();
+		}
+	});
+	tagCancelBtn.addEventListener("click", closeTagModal);
+	tagModal.addEventListener("click", (e) => {
+		if (e.target === tagModal) closeTagModal();
+	});
+	
+	// move modal
+
+	/** Rebuilds the folder option list inside the move modal, reflecting the
+	 *  current ALL_FOLDERS / ALL_VIDEOS state and highlighting moveSelectedFolder. */
+	addFolderBtn.addEventListener("click", () => {
+		const n = newFolderName.value.trim();
+		if (!n) return;
+		if (!ALL_FOLDERS.includes(n)) ALL_FOLDERS.push(n);
+		newFolderName.value = "";
+		moveSelectedFolder = n;
+		renderFolderOptions();
+	});
+	newFolderName.addEventListener("keydown", (e) => {
+		if (e.key === "Enter") addFolderBtn.click();
+	});
+	moveClose.addEventListener("click", closeMoveModal);
+	moveCancelBtn.addEventListener("click", closeMoveModal);
+	moveModal.addEventListener("click", (e) => {
+		if (e.target === moveModal) closeMoveModal();
+	});
+	moveConfirmBtn.addEventListener("click", async () => {
+		if (!moveSelectedFolder) return;
+		const paths =
+			selectedPaths.size > 0
+				? [...selectedPaths]
+				: moveTarget
+					? [moveTarget.path]
+					: [];
+		if (!paths.length) return;
+		let errs = 0;
+		for (const p of paths) {
+			const res = await fetch("/api/move", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ pin }),
+				body: JSON.stringify({ path: p, dest_folder: moveSelectedFolder }),
 			});
-			let j = {};
+			if (!res.ok) errs++;
+		}
+		await refresh();
+		if (errs) toast(errs + " move(s) failed", "error");
+		else
+			toast(
+				"Moved " +
+					(paths.length > 1 ? paths.length + " items" : "") +
+					(paths.length > 1 ? " to " : "") +
+					moveSelectedFolder,
+				"success",
+			);
+		if (selectMode) exitSelectMode();
+		closeMoveModal();
+	});
+
+	// upload modal
+
+	uploadFolderSel.addEventListener("change", () => {
+		if (uploadFolderSel.value === "__new__") {
+			newFolderInput.classList.add("visible");
+			newFolderInput.focus();
+		} else {
+			newFolderInput.classList.remove("visible");
+			newFolderInput.value = "";
+		}
+	});
+	openUploadBtn.addEventListener("click", () => {
+		uploadFiles = [];
+		renderFileQueue();
+		uploadModal.classList.add("open");
+	});
+	uploadClose.addEventListener("click", closeUploadModal);
+	uploadCancelBtn.addEventListener("click", closeUploadModal);
+	uploadModal.addEventListener("click", (e) => {
+		if (e.target === uploadModal) closeUploadModal();
+	});
+	dropZone.addEventListener("click", () => uploadInput.click());
+	dropZone.addEventListener("dragover", (e) => {
+		e.preventDefault();
+		dropZone.classList.add("drag-active");
+	});
+	dropZone.addEventListener("dragleave", () =>
+		dropZone.classList.remove("drag-active"),
+	);
+	dropZone.addEventListener("drop", (e) => {
+		e.preventDefault();
+		dropZone.classList.remove("drag-active");
+		addFiles([...e.dataTransfer.files]);
+	});
+	uploadInput.addEventListener("change", () => {
+		addFiles([...uploadInput.files]);
+		uploadInput.value = "";
+	});
+	
+	/** Updates the upload summary line and enables/disables the Upload button
+	 *  based on the number of valid (non-error) files in uploadFiles. */
+	uploadStartBtn.addEventListener("click", async () => {
+		let dest = uploadFolderSel.value;
+		if (dest === "__new__") dest = newFolderInput.value.trim() || "/";
+		const todo = uploadFiles.filter((f) => f.status === "pending");
+		uploadStartBtn.disabled = true;
+		for (const item of todo) {
+			setItemStatus(item.id, "uploading", "…");
+			const fd = new FormData();
+			fd.append("file", item.file);
+			fd.append("folder", dest);
 			try {
-				j = await res.json();
-			} catch {
-				/* ignore */
+				const res = await fetch("/api/upload", {
+					method: "POST",
+					body: fd,
+				});
+				const results = await res.json();
+				const r = results[0];
+				if (r && r.error) {
+					setItemStatus(item.id, "error", r.error);
+				} else {
+					setItemStatus(item.id, "done", "✓ done");
+					item.status = "done";
+					const guessedFolder =
+						dest && dest !== "/" && dest !== "__new__" ? dest : "/";
+					const extRaw = item.file.name.includes(".")
+						? "." + item.file.name.split(".").pop().toLowerCase()
+						: "";
+					upsertDownloadedVideo({
+						name: item.file.name,
+						path:
+							guessedFolder === "/"
+								? item.file.name
+								: guessedFolder + "/" + item.file.name,
+						folder: guessedFolder,
+						ext: extRaw,
+						size: item.file.size,
+						modified: new Date().toISOString(),
+						hash: "",
+						is_favorite: false,
+						tags: [],
+					});
+					refreshDerivedUI(false);
+				}
+			} catch (e) {
+				setItemStatus(item.id, "error", "failed");
 			}
-			if (!res.ok || !j.ok) {
-				setPinOverlayVisible(true, "Incorrect PIN.");
-				if (pinGateInput) pinGateInput.select();
-				return;
-			}
-			pinGateUnlocked = true;
-			setPinOverlayVisible(false);
-			updatePinLockButton();
-			await init();
-		} catch (err) {
-			console.error(err);
-			setPinOverlayVisible(true, "Could not reach server.");
+		}
+		await refresh();
+		uploadStartBtn.disabled = false;
+		toast("Upload complete", "success");
+	});
+
+	searchEl.addEventListener("input", render);
+	sortSel.addEventListener("change", render);
+	gridBtn.addEventListener("click", () => {
+		gallery.classList.remove("list-view");
+		gridBtn.classList.add("active");
+		listBtn.classList.remove("active");
+	});
+	listBtn.addEventListener("click", () => {
+		gallery.classList.add("list-view");
+		listBtn.classList.add("active");
+		gridBtn.classList.remove("active");
+	});
+	favoritesOnlyToggle.addEventListener("change", () => {
+		showFavoritesOnly = favoritesOnlyToggle.checked;
+		render();
+	});
+	
+	// select mode
+	/** Syncs the floating select bar's count label and visibility with selectedPaths. */
+
+	selectBtn.addEventListener("click", () => {
+		if (selectMode) {
+			exitSelectMode();
+		} else {
+			selectMode = true;
+			document.body.classList.add("select-mode");
+			selectBtn.classList.add("active");
 		}
 	});
-}
-if (pinLockBtn) {
-	pinLockBtn.addEventListener("click", async () => {
+	selectMoveBtn.addEventListener("click", () => {
+		if (!selectedPaths.size) return;
+		const first =
+			filtered.find((v) => selectedPaths.has(v.path)) || filtered[0];
+		openMoveModal(first);
+	});
+	selectForgetBtn.addEventListener("click", async () => {
+		if (!selectedPaths.size) return;
+		const paths = [...selectedPaths];
+		const ok = await forgetVideos(paths, [], false);
+		if (!ok) {
+			toast("Forget operation failed", "error");
+			return;
+		}
+		await refresh();
+		exitSelectMode();
+		toast("Forgot " + paths.length + " file(s)", "success");
+	});
+	selectTagBtn.addEventListener("click", () => {
+		if (!selectedPaths.size) return;
+		const targets = filtered.filter((v) => selectedPaths.has(v.path));
+		if (!targets.length) return;
+		openTagModal(targets);
+	});
+	selectCollectionBtn.addEventListener("click", () => {
+		if (!selectedPaths.size) return;
+		const targets = filtered.filter((v) => selectedPaths.has(v.path));
+		const hashes = [...new Set(targets.map((v) => v.hash).filter(Boolean))];
+		if (!hashes.length) {
+			toast("No valid hashes found in selection", "error");
+			return;
+		}
+		openCollectionPicker(hashes);
+	});
+	selectAllBtn.addEventListener("click", () => {
+		filtered.forEach((v) => selectedPaths.add(v.path));
+		document.querySelectorAll(".card").forEach((c) => {
+			if (filtered.some((v) => v.path === c.dataset.path))
+				c.classList.add("selected");
+		});
+		updateSelectBar();
+	});
+	selectClearBtn.addEventListener("click", () => {
+		selectedPaths.clear();
+		document
+			.querySelectorAll(".card.selected")
+			.forEach((c) => c.classList.remove("selected"));
+		updateSelectBar();
+	});
+	
+	// tags (sidebar)
+	newTagBtn.addEventListener("click", () => {
+		tagsSection.classList.remove("collapsed");
+		sidebarTagForm.classList.add("visible");
+		sidebarTagInput.value = "";
+		sidebarTagInput.focus();
+	});
+	sidebarTagCancel.addEventListener("click", hideSidebarTagForm);
+	sidebarTagConfirm.addEventListener("click", createSidebarTag);
+	sidebarTagInput.addEventListener("keydown", (e) => {
+		if (e.key === "Enter") createSidebarTag();
+		if (e.key === "Escape") hideSidebarTagForm();
+	});
+	
+	// collections (sidebar)
+	newCollectionBtn.addEventListener("click", () => {
+		collectionsSection.classList.remove("collapsed");
+		sidebarCollectionForm.classList.add("visible");
+		sidebarCollectionInput.value = "";
+		sidebarCollectionInput.focus();
+	});
+	sidebarCollectionCancel.addEventListener("click", hideSidebarCollectionForm);
+	sidebarCollectionConfirm.addEventListener("click", createSidebarCollection);
+	sidebarCollectionInput.addEventListener("keydown", (e) => {
+		if (e.key === "Enter") createSidebarCollection();
+		if (e.key === "Escape") hideSidebarCollectionForm();
+	});
+	
+	tagsCollapseBtn.addEventListener("click", () => {
+		tagsSection.classList.toggle("collapsed");
+	});
+	collectionsCollapseBtn.addEventListener("click", () => {
+		collectionsSection.classList.toggle("collapsed");
+	});
+	foldersCollapseBtn.addEventListener("click", () => {
+		foldersSection.classList.toggle("collapsed");
+	});
+	
+	// new folder (sidebar)
+	newFolderBtn.addEventListener("click", () => {
+		foldersSection.classList.remove("collapsed");
+		sidebarFolderForm.classList.add("visible");
+		sidebarFolderInput.value = "";
+		sidebarFolderInput.focus();
+	});
+	sidebarFolderCancel.addEventListener("click", hideSidebarFolderForm);
+	sidebarFolderConfirm.addEventListener("click", createFolder);
+	sidebarFolderInput.addEventListener("keydown", (e) => {
+		if (e.key === "Enter") createFolder();
+		if (e.key === "Escape") hideSidebarFolderForm();
+	});
+
+	dupReviewBtn.addEventListener("click", openDuplicateModal);
+	dupDismissBtn.addEventListener("click", () => {
+		duplicateBannerDismissed = true;
+		dupBanner.classList.remove("visible");
+	});
+	dupClose.addEventListener("click", closeDuplicateModal);
+	dupCancelBtn.addEventListener("click", closeDuplicateModal);
+	dupModal.addEventListener("click", (e) => {
+		if (e.target === dupModal) closeDuplicateModal();
+	});
+	dupResolveAllBtn.addEventListener("click", resolveAllDuplicateGroups);
+	
+	incomingReviewBtn.addEventListener("click", () => {
+		activeIncomingFilter = true;
+		activeFolder = "__all__";
+		buildIncomingNav();
+		buildFolderNav();
+		render();
+	});
+	incomingMassSortBtn.addEventListener("click", openIncomingModal);
+	incomingDismissBtn.addEventListener("click", () => {
+		incomingBannerDismissed = true;
+		incomingBanner.classList.remove("visible");
+	});
+	incomingClose.addEventListener("click", closeIncomingModal);
+	incomingCancelBtn.addEventListener("click", closeIncomingModal);
+	incomingModal.addEventListener("click", (e) => {
+		if (e.target === incomingModal) closeIncomingModal();
+	});
+	incomingMarkAllBtn.addEventListener("click", async () => {
+		const incomingPaths = ALL_VIDEOS.filter((v) => Boolean(v.is_new)).map((v) => v.path);
+		if (!incomingPaths.length) return;
+		const ok = await clearNewStatus(incomingPaths, false);
+		if (!ok) {
+			toast("Failed to mark incoming files as reviewed", "error");
+			return;
+		}
+		await refresh();
+		toast("Marked all incoming as reviewed", "success");
+	});
+	incomingMarkReviewedBtn.addEventListener("click", async () => {
+		const incoming = ALL_VIDEOS.filter((v) => Boolean(v.is_new)).map((v) => v.path);
+		if (!incoming.length) {
+			closeIncomingModal();
+			return;
+		}
+		const ok = await clearNewStatus(incoming, true);
+		if (!ok) {
+			toast("Failed to mark incoming files as reviewed", "error");
+			return;
+		}
+		closeIncomingModal();
+		await refresh();
+	});
+	incomingConfirmBtn.addEventListener("click", async () => {
+		const incoming = ALL_VIDEOS.filter((v) => Boolean(v.is_new));
+		if (!incoming.length) {
+			closeIncomingModal();
+			return;
+		}
+		let errs = 0;
+		const reviewedPaths = [];
+		for (const video of incoming) {
+			if ((video.folder || "/") === incomingSelectedFolder) {
+				reviewedPaths.push(video.path);
+				continue;
+			}
+			const res = await fetch("/api/move", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					path: video.path,
+					dest_folder: incomingSelectedFolder,
+				}),
+			});
+			if (!res.ok) errs++;
+			else reviewedPaths.push(video.path);
+		}
+		const incomingHashes = [...new Set(incoming.map((v) => v.hash).filter(Boolean))];
+		let tagErrs = 0;
+		if (incomingSelectedTagIDs.size && incomingHashes.length) {
+			for (const tagID of incomingSelectedTagIDs) {
+				const ok = await setTagAssignmentsBulk(incomingHashes, tagID, true);
+				if (!ok) tagErrs++;
+			}
+		}
+		const ok = await clearNewStatus(reviewedPaths, false);
+		if (!ok) {
+			toast("Moves completed but clear status failed", "error");
+		}
+		if (ok && !errs && !tagErrs) {
+			activeIncomingFilter = false;
+		}
+		closeIncomingModal();
+		await refresh();
+		if (errs || tagErrs) {
+			toast(
+				(errs ? errs + " move(s) failed. " : "") +
+					(tagErrs ? tagErrs + " tag update(s) failed." : ""),
+				"error",
+			);
+		} else {
+			toast("Incoming media mass sorted", "success");
+		}
+	});
+	
+	collectionPickerClose.addEventListener("click", closeCollectionPicker);
+	collectionPickerCancelBtn.addEventListener("click", closeCollectionPicker);
+	collectionPickerModal.addEventListener("click", (e) => {
+		if (e.target === collectionPickerModal) closeCollectionPicker();
+	});
+	collectionPickerNewBtn.addEventListener("click", async () => {
+		const name = collectionPickerNewInput.value.trim();
+		if (!name) return;
+		const created = await createCollection(name);
+		if (!created) {
+			toast("Create collection failed", "error");
+			return;
+		}
+		collectionPickerNewInput.value = "";
 		try {
-			const res = await fetch("/api/auth/lock", { method: "POST" });
-			if (!res.ok) return;
-			unloadLibraryAfterPinLock();
-			pinGateUnlocked = false;
-			updatePinLockButton();
-			if (pinGateInput) pinGateInput.value = "";
-			setPinOverlayVisible(true);
+			await refreshCollectionsOnly();
+			buildCollectionNav();
 		} catch (e) {
-			console.error(e);
+			await refresh();
+		}
+		collectionPickerSelectedID = created.id;
+		renderCollectionPickerOptions();
+	});
+	collectionPickerNewInput.addEventListener("keydown", (e) => {
+		if (e.key === "Enter") collectionPickerNewBtn.click();
+	});
+	collectionPickerConfirmBtn.addEventListener("click", async () => {
+		if (!collectionPickerSelectedID || !collectionPickerTargetHashes.length)
+			return;
+		const collectionId = collectionPickerSelectedID;
+		const ok = await bulkAddCollectionVideos(
+			collectionId,
+			collectionPickerTargetHashes,
+		);
+		if (!ok) {
+			toast("Add to collection failed", "error");
+			return;
+		}
+		try {
+			await refreshCollectionsOnly();
+			buildCollectionNav();
+			if (activeCollectionID === collectionId) openWatchCollection(collectionId);
+		} catch (e) {
+			await refresh();
+		}
+		closeCollectionPicker();
+		if (selectMode) exitSelectMode();
+		toast("Added to collection", "success");
+	});
+	
+	watchCollectionClose.addEventListener("click", closeWatchCollection);
+	watchCollectionPlayAllBtn.addEventListener("click", () => {
+		const videos = getWatchCollectionVideos();
+		for (const video of videos) {
+			video.play().catch(() => {});
 		}
 	});
+	watchCollectionPauseAllBtn.addEventListener("click", () => {
+		const videos = getWatchCollectionVideos();
+		for (const video of videos) {
+			video.pause();
+		}
+	});
+	watchCollectionMuteAllBtn.addEventListener("click", () => {
+		watchCollectionMasterMuted = !watchCollectionMasterMuted;
+		persistStorageValue(WATCH_GRID_MUTED_STORAGE_KEY, watchCollectionMasterMuted);
+		applyWatchMasterAudioToAll();
+		syncWatchCollectionControls();
+	});
+	watchCollectionVolumeInput.addEventListener("input", () => {
+		watchCollectionMasterVolume = Math.max(
+			0,
+			Math.min(1, Number(watchCollectionVolumeInput.value) || 0),
+		);
+		persistStorageValue(WATCH_GRID_VOLUME_STORAGE_KEY, watchCollectionMasterVolume);
+		applyWatchMasterAudioToAll();
+	});
+	watchCollectionGridCols.addEventListener("change", () => {
+		watchGridCols = Math.max(
+			1,
+			Math.min(4, Number(watchCollectionGridCols.value) || 4),
+		);
+		persistStorageValue(WATCH_GRID_COLS_STORAGE_KEY, watchGridCols);
+		const grid = watchCollectionBody.querySelector(".watch-grid");
+		applyWatchGridClass(grid);
+		syncWatchCollectionControls();
+	});
+	watchCollectionModal.addEventListener("click", (e) => {
+		if (e.target === watchCollectionModal) closeWatchCollection();
+	});
+	watchCollectionDeleteBtn.addEventListener("click", async () => {
+		if (!activeCollectionID) return;
+		const c = COLLECTION_MAP[activeCollectionID];
+		if (!c) return;
+		if (!confirm('Delete collection "' + c.name + '"?')) return;
+		const ok = await deleteCollection(activeCollectionID);
+		if (!ok) {
+			toast("Collection delete failed", "error");
+			return;
+		}
+		closeWatchCollection();
+		await refresh();
+	});
+	watchCollectionRenameBtn.addEventListener("click", async () => {
+		if (!activeCollectionID) return;
+		const c = COLLECTION_MAP[activeCollectionID];
+		if (!c) return;
+		const nextName = prompt("Rename collection", c.name);
+		if (!nextName || !nextName.trim()) return;
+		const ok = await renameCollection(activeCollectionID, nextName.trim());
+		if (!ok) {
+			toast("Collection rename failed", "error");
+			return;
+		}
+		await refresh();
+		openWatchCollection(activeCollectionID);
+	});
+	
+	if (previewSettingsLauncher) {
+		previewSettingsLauncher.addEventListener("click", () => {
+			openPreviewSettings();
+		});
+	}
+	if (previewSettingsClose) {
+		previewSettingsClose.addEventListener("click", () => {
+			closePreviewSettings();
+		});
+	}
+	if (previewSettingsModal) {
+		previewSettingsModal.addEventListener("click", (e) => {
+			if (e.target === previewSettingsModal) closePreviewSettings();
+		});
+	}
+	if (previewSettingsAudioToggleBtn) {
+		previewSettingsAudioToggleBtn.addEventListener("click", () => {
+			toggleHoverPreviewAudio();
+		});
+	}
+	if (previewSettingsVolumeInput) {
+		previewSettingsVolumeInput.addEventListener("input", () => {
+			hoverPreviewVolume = Math.max(
+				0,
+				Math.min(1, Number(previewSettingsVolumeInput.value) || 0),
+			);
+			persistStorageValue(HOVER_PREVIEW_VOLUME_KEY, hoverPreviewVolume);
+			applyHoverPreviewAudioToAll();
+		});
+	}
+	
+	if (pinGateForm) {
+		pinGateForm.addEventListener("submit", async (e) => {
+			e.preventDefault();
+			const pin = (pinGateInput && pinGateInput.value) || "";
+			if (pinGateError) {
+				pinGateError.hidden = true;
+				pinGateError.textContent = "";
+			}
+			try {
+				const res = await fetch("/api/auth/pin", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ pin }),
+				});
+				let j = {};
+				try {
+					j = await res.json();
+				} catch {
+					/* ignore */
+				}
+				if (!res.ok || !j.ok) {
+					setPinOverlayVisible(true, "Incorrect PIN.");
+					if (pinGateInput) pinGateInput.select();
+					return;
+				}
+				pinGateUnlocked = true;
+				setPinOverlayVisible(false);
+				updatePinLockButton();
+				await init();
+			} catch (err) {
+				console.error(err);
+				setPinOverlayVisible(true, "Could not reach server.");
+			}
+		});
+	}
+	if (pinLockBtn) {
+		pinLockBtn.addEventListener("click", async () => {
+			try {
+				const res = await fetch("/api/auth/lock", { method: "POST" });
+				if (!res.ok) return;
+				unloadLibraryAfterPinLock();
+				pinGateUnlocked = false;
+				updatePinLockButton();
+				if (pinGateInput) pinGateInput.value = "";
+				setPinOverlayVisible(true);
+			} catch (e) {
+				console.error(e);
+			}
+		});
+	}
+	
 }
 
-bootstrap();
+	onMount(() => {
+	initDomRefs();
+	setOnPinLock(() => {
+		setPinGateUnlocked(false);
+		pinGateUnlocked = false;
+		updatePinLockButton();
+		unloadLibraryAfterPinLock();
+		setPinOverlayVisible(true, 'Session locked or PIN required.');
+	});
+	wireAppEvents();
+	bootstrap();
+});
+</script>
+
+<div id="pin-gate-overlay" class="pin-gate-overlay" aria-hidden="true" hidden>
+  <div class="pin-gate-dialog" role="dialog" aria-labelledby="pin-gate-title">
+    <div class="logo pin-gate-logo">VID<span>VAULT</span></div>
+    <p id="pin-gate-title" class="pin-gate-title">Enter PIN to continue</p>
+    <form id="pin-gate-form" class="pin-gate-form" autocomplete="off" data-lpignore="true" data-form-type="other">
+      <input type="password" id="pin-gate-input" class="pin-gate-input" name="vv_pin" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" inputmode="numeric" aria-label="PIN" data-lpignore="true" data-1p-ignore data-bwignore data-form-type="other">
+      <p id="pin-gate-error" class="pin-gate-error" hidden></p>
+      <button type="submit" class="btn pin-gate-submit">Unlock</button>
+    </form>
+  </div>
+</div>
+
+<header>
+  <div class="logo">VID<span>VAULT</span></div>
+  <div class="stats" id="stats"></div>
+  <div class="controls">
+    <label class="favorites-only-toggle" title="Show favorites only">
+      <span class="favorites-switch">
+        <input type="checkbox" id="favorites-only-toggle" class="favorites-switch-input">
+        <span class="favorites-switch-ui" aria-hidden="true">
+          <span class="favorites-switch-track"></span>
+          <span class="favorites-switch-thumb">
+            <svg class="favorites-switch-star" xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l2.4 7.4h7.6l-6 4.6 2.3 7-6.3-4.6-6.3 4.6 2.3-7-6-4.6h7.6z"/></svg>
+          </span>
+        </span>
+      </span>
+      <span class="favorites-only-label">Favorites only</span>
+    </label>
+    <div class="search-wrap">
+      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input id="search" type="search" placeholder="filter files…" autocomplete="off">
+    </div>
+    <select class="btn" id="sort-select">
+      <option value="name">name ↑</option>
+      <option value="name-desc">name ↓</option>
+      <option value="folder">folder</option>
+      <option value="ext">type</option>
+      <option value="modified-desc">modified (newest)</option>
+      <option value="modified">modified (oldest)</option>
+      <option value="size-desc">size (largest)</option>
+      <option value="size">size (smallest)</option>
+    </select>
+    <div class="btn-group">
+      <button class="btn active" id="grid-btn" title="Grid view">⊞</button>
+      <button class="btn"        id="list-btn" title="List view">☰</button>
+    </div>
+    <button class="btn" id="select-btn" title="Select multiple">Select</button>
+    <button type="button" class="btn pin-lock-btn" id="pin-lock-btn" title="Lock session" hidden>
+      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      Lock
+    </button>
+    <button class="btn upload-btn" id="open-upload-btn">
+      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Upload
+    </button>
+  </div>
+</header>
+
+<div class="dup-banner" id="dup-banner">
+  <span class="dup-banner-text" id="dup-banner-text"></span>
+  <div class="dup-banner-actions">
+    <button class="btn active" id="dup-review-btn">Review duplicates</button>
+    <button class="btn" id="dup-dismiss-btn">Dismiss</button>
+  </div>
+</div>
+
+<div class="incoming-banner" id="incoming-banner">
+  <span class="incoming-banner-text" id="incoming-banner-text"></span>
+  <div class="incoming-banner-actions">
+    <button class="btn" id="incoming-review-btn">View</button>
+    <button class="btn active" id="incoming-mass-sort-btn">Mass sort</button>
+    <button class="btn" id="incoming-dismiss-btn">Dismiss</button>
+  </div>
+</div>
+
+<div class="shell">
+  <aside>
+    <div class="sidebar-section" id="incoming-sidebar-section">
+      <div class="sidebar-header">
+        <span class="sidebar-label">Incoming</span>
+      </div>
+      <div id="incoming-list"></div>
+      <div class="sidebar-inline-actions">
+        <button class="btn" id="incoming-mark-all-btn">Mark as resolved</button>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-header" id="tags-header">
+        <span class="sidebar-label">Tags</span>
+        <div class="sidebar-actions">
+          <button class="new-folder-btn" id="new-tag-btn" title="New tag">+</button>
+          <button class="collapse-btn" id="tags-collapse-btn" title="Collapse tags">▾</button>
+        </div>
+      </div>
+      <div class="sidebar-tag-form" id="sidebar-tag-form">
+        <input id="sidebar-tag-input" placeholder="tag name…" autocomplete="off">
+        <button id="sidebar-tag-confirm" title="Create">✓</button>
+        <button id="sidebar-tag-cancel" title="Cancel">✕</button>
+      </div>
+      <div id="tag-list"></div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-header" id="collections-header">
+        <span class="sidebar-label">Collections</span>
+        <div class="sidebar-actions">
+          <button class="new-folder-btn" id="new-collection-btn" title="New collection">+</button>
+          <button class="collapse-btn" id="collections-collapse-btn" title="Collapse collections">▾</button>
+        </div>
+      </div>
+      <div class="sidebar-collection-form" id="sidebar-collection-form">
+        <input id="sidebar-collection-input" placeholder="collection name…" autocomplete="off">
+        <button id="sidebar-collection-confirm" title="Create">✓</button>
+        <button id="sidebar-collection-cancel" title="Cancel">✕</button>
+      </div>
+      <div id="collection-list"></div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-header">
+        <span class="sidebar-label">Folders</span>
+        <div class="sidebar-actions">
+          <button class="new-folder-btn" id="new-folder-btn" title="New folder">+</button>
+          <button class="collapse-btn" id="folders-collapse-btn" title="Collapse folders">▾</button>
+        </div>
+      </div>
+      <div class="sidebar-folder-form" id="sidebar-folder-form">
+        <input id="sidebar-folder-input" placeholder="folder name…" autocomplete="off">
+        <button id="sidebar-folder-confirm" title="Create">✓</button>
+        <button id="sidebar-folder-cancel" title="Cancel">✕</button>
+      </div>
+      <div id="folder-list"></div>
+    </div>
+
+    <button type="button" class="btn preview-settings-launcher" id="preview-settings-launcher" title="Preview settings" aria-label="Preview settings">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span class="preview-settings-launcher-label">settings</span>
+    </button>
+  </aside>
+  <main><div id="gallery"></div></main>
+</div>
+
+<div id="ctx-menu">
+  <div class="ctx-item" id="ctx-tags">
+    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41 11 3H4v7l9.59 9.59a2 2 0 0 0 2.82 0l4.18-4.18a2 2 0 0 0 0-2.82z"/><path d="M7 7h.01"/></svg>
+    Edit tags…
+  </div>
+  <div class="ctx-item" id="ctx-move">
+    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 9l4-4 4 4"/><path d="M9 5v14"/><path d="M19 15l-4 4-4-4"/><path d="M15 19V5"/></svg>
+    Move to folder…
+  </div>
+  <div class="ctx-item" id="ctx-rename">
+    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+    Rename file…
+  </div>
+  <div class="ctx-item danger" id="ctx-delete">
+    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+    Delete file…
+  </div>
+  <div class="ctx-item" id="ctx-forget">
+    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18"/><path d="M12 3v18"/></svg>
+    Forget (mark as new)…
+  </div>
+</div>
+
+<div id="move-modal">
+  <div class="move-inner">
+    <div class="move-header">
+      <div><div class="move-title">Move to folder</div><div class="move-subtitle" id="move-subtitle"></div></div>
+      <button class="close-btn" id="move-close">✕</button>
+    </div>
+    <div class="move-body">
+      <div class="move-new-folder">
+        <input id="new-folder-name" placeholder="+ new folder name…" autocomplete="off">
+        <button class="btn" id="add-folder-btn">Create</button>
+      </div>
+      <div id="folder-options"></div>
+    </div>
+    <div class="move-footer">
+      <button class="btn" id="move-cancel-btn">Cancel</button>
+      <button class="btn active" id="move-confirm-btn">Move</button>
+    </div>
+  </div>
+</div>
+
+<div id="upload-modal">
+  <div class="upload-inner">
+    <div class="upload-header">
+      <div class="upload-title">Upload videos</div>
+      <button class="close-btn" id="upload-close">✕</button>
+    </div>
+    <div class="upload-body">
+      <div class="drop-zone" id="drop-zone">
+        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <strong>Drop videos here</strong>
+        <span>or click to browse — webm, mp4, mkv, mov, avi…</span>
+        <input type="file" id="upload-input" multiple accept=".webm,.mp4,.mpv,.mkv,.mov,.avi,.m4v,.ogv">
+      </div>
+      <div class="upload-folder-row">
+        <label>Destination</label>
+        <select id="upload-folder-select"></select>
+        <input id="new-folder-input" placeholder="new/folder/name">
+      </div>
+      <div class="file-queue" id="file-queue"></div>
+    </div>
+    <div class="upload-footer">
+      <span class="upload-summary" id="upload-summary"></span>
+      <div style="display:flex;gap:8px">
+        <button class="btn" id="upload-cancel-btn">Cancel</button>
+        <button class="btn active" id="upload-start-btn" disabled>Upload</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="tag-modal">
+  <div class="tag-inner">
+    <div class="tag-header">
+      <div>
+        <div class="tag-title">Edit tags</div>
+        <div class="tag-subtitle" id="tag-subtitle"></div>
+      </div>
+      <button class="close-btn" id="tag-close">✕</button>
+    </div>
+    <div class="tag-body">
+      <div class="tag-new-row">
+        <input id="tag-new-input" placeholder="+ new tag name…" autocomplete="off">
+        <button class="btn" id="tag-new-btn">Create</button>
+      </div>
+      <div id="tag-options"></div>
+    </div>
+    <div class="tag-footer">
+      <span class="tag-pending-summary" id="tag-pending-summary"></span>
+      <button class="btn active" id="tag-apply-btn" disabled>Apply changes</button>
+      <button class="btn" id="tag-cancel-btn">Close</button>
+    </div>
+  </div>
+</div>
+
+<div id="dup-modal">
+  <div class="dup-inner">
+    <div class="dup-header">
+      <div>
+        <div class="dup-title">Duplicate manager</div>
+        <div class="dup-subtitle" id="dup-subtitle"></div>
+      </div>
+      <button class="close-btn" id="dup-close">✕</button>
+    </div>
+    <div class="dup-body" id="dup-groups"></div>
+    <div class="dup-footer">
+      <button class="btn" id="dup-cancel-btn">Close</button>
+      <button class="btn active" id="dup-resolve-all-btn">Resolve all groups</button>
+    </div>
+  </div>
+</div>
+
+<div id="incoming-modal">
+  <div class="move-inner">
+    <div class="move-header">
+      <div>
+        <div class="move-title">Mass sort incoming media</div>
+        <div class="move-subtitle" id="incoming-subtitle"></div>
+      </div>
+      <button class="close-btn" id="incoming-close">✕</button>
+    </div>
+    <div class="move-body">
+      <div>
+        <div class="sidebar-label" style="padding-bottom:6px">Add tags to all incoming</div>
+        <div id="incoming-tag-options"></div>
+      </div>
+      <div>
+        <div class="sidebar-label" style="padding-bottom:6px">Move all incoming to folder</div>
+        <div id="incoming-folder-options"></div>
+      </div>
+    </div>
+    <div class="move-footer">
+      <button class="btn" id="incoming-cancel-btn">Close</button>
+      <button class="btn active" id="incoming-confirm-btn">Apply mass sort</button>
+      <button class="btn" id="incoming-mark-reviewed-btn">Mark as resolved</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal">
+  <div class="modal-inner">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-title"></span>
+      <span class="modal-path"  id="modal-path"></span>
+      <div class="modal-nav">
+        <button class="nav-btn" id="prev-btn">‹</button>
+        <button class="nav-btn" id="next-btn">›</button>
+      </div>
+      <button class="close-btn" id="close-btn">✕</button>
+    </div>
+    <video id="modal-video" controls autoplay loop></video>
+  </div>
+</div>
+
+<div class="select-bar" id="select-bar">
+  <span class="select-count" id="select-count">0 selected</span>
+  <button class="btn" id="select-tag-btn">Tags…</button>
+  <button class="btn" id="select-collection-btn">Add to collection…</button>
+  <button class="btn active" id="select-move-btn">Move…</button>
+  <button class="btn" id="select-forget-btn">Forget…</button>
+  <button class="btn" id="select-all-btn">All</button>
+  <button class="btn" id="select-clear-btn">Clear</button>
+</div>
+
+<div id="collection-picker-modal">
+  <div class="collection-picker-inner">
+    <div class="collection-picker-header">
+      <div>
+        <div class="collection-picker-title">Add to collection</div>
+        <div class="collection-picker-subtitle" id="collection-picker-subtitle"></div>
+      </div>
+      <button class="close-btn" id="collection-picker-close">✕</button>
+    </div>
+    <div class="collection-picker-body">
+      <div class="collection-new-row">
+        <input id="collection-picker-new-input" placeholder="+ new collection name…" autocomplete="off">
+        <button class="btn" id="collection-picker-new-btn">Create</button>
+      </div>
+      <div id="collection-picker-options"></div>
+    </div>
+    <div class="collection-picker-footer">
+      <button class="btn" id="collection-picker-cancel-btn">Cancel</button>
+      <button class="btn active" id="collection-picker-confirm-btn">Add selected</button>
+    </div>
+  </div>
+</div>
+
+<div id="watch-collection-modal">
+  <div class="watch-collection-inner">
+    <div class="watch-collection-header">
+      <div>
+        <div class="watch-collection-title" id="watch-collection-title"></div>
+        <div class="watch-collection-subtitle" id="watch-collection-subtitle"></div>
+      </div>
+      <div class="watch-collection-actions">
+        <button class="btn" id="watch-collection-play-all-btn">Play all</button>
+        <button class="btn" id="watch-collection-pause-all-btn">Pause all</button>
+        <button class="btn" id="watch-collection-mute-all-btn">Mute all</button>
+        <label class="watch-volume-control" for="watch-collection-volume-input">
+          Vol
+          <input id="watch-collection-volume-input" type="range" min="0" max="1" step="0.05" value="1">
+        </label>
+        <label class="watch-grid-control" for="watch-collection-grid-cols">
+          Grid
+          <select class="btn" id="watch-collection-grid-cols">
+            <option value="4">4</option>
+            <option value="3">3</option>
+            <option value="2">2</option>
+            <option value="1">1</option>
+          </select>
+        </label>
+        <button class="btn" id="watch-collection-rename-btn">Rename</button>
+        <button class="btn" id="watch-collection-delete-btn">Delete</button>
+        <button class="close-btn" id="watch-collection-close">✕</button>
+      </div>
+    </div>
+    <div class="watch-collection-body" id="watch-collection-body"></div>
+  </div>
+</div>
+
+<div id="preview-settings-modal">
+  <div class="preview-settings-inner">
+    <div class="preview-settings-header">
+      <div class="preview-settings-title">Preview settings</div>
+      <button type="button" class="close-btn" id="preview-settings-close" aria-label="Close">✕</button>
+    </div>
+    <div class="preview-settings-body">
+      <div class="preview-settings-row">
+        <span class="preview-settings-label">Hover preview audio</span>
+        <button type="button" class="btn" id="preview-settings-audio-toggle">Off</button>
+      </div>
+      <label class="preview-settings-row preview-settings-volume-row" for="preview-settings-volume">
+        <span class="preview-settings-label">Preview volume</span>
+        <input id="preview-settings-volume" type="range" min="0" max="1" step="0.05" value="0.5">
+      </label>
+    </div>
+  </div>
+</div>
+
+

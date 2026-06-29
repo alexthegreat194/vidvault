@@ -1,4 +1,6 @@
 ./output
 node_modules/
+frontend/node_modules/
+src/web/dist/
 vidvault
 data/

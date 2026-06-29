@@ -57,6 +57,8 @@ func authPublicWithoutSession(r *http.Request) bool {
 		return true
 	case r.Method == http.MethodGet && r.URL.Path == "/favicon.svg":
 		return true
+	case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/assets/"):
+		return true
 	case r.Method == http.MethodGet && r.URL.Path == "/api/auth/status":
 		return true
 	case r.Method == http.MethodPost && r.URL.Path == "/api/auth/pin":

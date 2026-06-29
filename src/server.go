@@ -3,8 +3,8 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
+	"io/fs"
 	"mime"
 	"mime/multipart"
 	"net/http"
@@ -74,8 +74,8 @@ func newServer(root, pin string) (*server, error) {
 	s.mux.HandleFunc("POST /api/auth/pin", s.handleAuthPin)
 	s.mux.HandleFunc("POST /api/auth/lock", s.handleAuthLock)
 	s.mux.HandleFunc("GET /favicon.svg", s.handleFavicon)
-	s.mux.HandleFunc("/", s.handleIndex)
-	s.mux.HandleFunc("/api/videos", s.handleVideos)
+	s.mux.HandleFunc("GET /assets/{path...}", s.handleWebAssets)
+	s.mux.HandleFunc("GET /api/videos", s.handleVideos)
 	s.mux.HandleFunc("GET /api/videos/stream", s.handleVideosStream)
 	s.mux.HandleFunc("GET /api/favorites", s.handleFavorites)
 	s.mux.HandleFunc("POST /api/favorites/set", s.handleSetFavorite)
@@ -92,16 +92,17 @@ func newServer(root, pin string) (*server, error) {
 	s.mux.HandleFunc("POST /api/collections/videos/set", s.handleSetCollectionVideo)
 	s.mux.HandleFunc("POST /api/collections/videos/bulk", s.handleBulkCollectionVideos)
 	s.mux.HandleFunc("POST /api/collections/from-folder", s.handleCreateCollectionFromFolder)
-	s.mux.HandleFunc("/api/folders", s.handleFolders)
-	s.mux.HandleFunc("/api/mkdir", s.handleMkdir)
-	s.mux.HandleFunc("/api/rmdir", s.handleRmdir)
-	s.mux.HandleFunc("/api/move", s.handleMove)
-	s.mux.HandleFunc("/api/rename", s.handleRename)
-	s.mux.HandleFunc("/api/delete", s.handleDelete)
-	s.mux.HandleFunc("/api/upload", s.handleUpload)
+	s.mux.HandleFunc("GET /api/folders", s.handleFolders)
+	s.mux.HandleFunc("POST /api/mkdir", s.handleMkdir)
+	s.mux.HandleFunc("POST /api/rmdir", s.handleRmdir)
+	s.mux.HandleFunc("POST /api/move", s.handleMove)
+	s.mux.HandleFunc("POST /api/rename", s.handleRename)
+	s.mux.HandleFunc("POST /api/delete", s.handleDelete)
+	s.mux.HandleFunc("POST /api/upload", s.handleUpload)
 	s.mux.HandleFunc("POST /api/videos/new/clear", s.handleClearNewVideos)
 	s.mux.HandleFunc("POST /api/videos/new/forget", s.handleForgetVideos)
-	s.mux.HandleFunc("/video", s.handleVideo)
+	s.mux.HandleFunc("GET /video", s.handleVideo)
+	s.mux.HandleFunc("GET /", s.handleIndex)
 	serverLog.Info("routes registered", "root", root)
 
 	go video.ScanVideos(root, s.videoCache)
@@ -167,13 +168,32 @@ func (w *statusWriter) Write(p []byte) (int, error) {
 
 func (s *server) handleFavicon(w http.ResponseWriter, r *http.Request) {
 	serverLog.Debug("serving favicon")
-	data, err := webFS.ReadFile("web/favicon.svg")
-	if err != nil {
-		serverLog.Error("favicon asset missing", "error", err)
+	s.serveWebFile(w, r, "favicon.svg", "image/svg+xml")
+}
+
+func (s *server) handleWebAssets(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/assets/")
+	if path == "" || strings.Contains(path, "..") {
 		http.NotFound(w, r)
 		return
 	}
-	w.Header().Set("Content-Type", "image/svg+xml")
+	s.serveWebFile(w, r, "assets/"+path, "")
+}
+
+func (s *server) serveWebFile(w http.ResponseWriter, r *http.Request, name, contentType string) {
+	data, err := fs.ReadFile(webRoot, name)
+	if err != nil {
+		serverLog.Debug("web asset missing", "path", name, "error", err)
+		http.NotFound(w, r)
+		return
+	}
+	if contentType != "" {
+		w.Header().Set("Content-Type", contentType)
+	} else if strings.HasSuffix(name, ".js") {
+		w.Header().Set("Content-Type", "application/javascript")
+	} else if strings.HasSuffix(name, ".css") {
+		w.Header().Set("Content-Type", "text/css")
+	}
 	w.Write(data)
 }
 
@@ -183,9 +203,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprint(w, indexHTML)
+	s.serveWebFile(w, r, "index.html", "text/html; charset=utf-8")
 }
 
 // handleVideos HTTP handler for all video metadata

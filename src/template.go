@@ -2,37 +2,23 @@ package main
 
 import (
 	"embed"
-	"strings"
+	"io/fs"
 	"vidvault/src/logging"
 )
 
 var templateLog = logging.FileLogger("template")
 
-//go:embed web/*
-var webFS embed.FS
+//go:embed web/dist/*
+var webDist embed.FS
 
-var indexHTML string
-
-var webPartPaths = []string{
-	"web/head.html",
-	"web/styles.css",
-	"web/body.html",
-	"web/app.js",
-	"web/foot.html",
-}
+var webRoot fs.FS
 
 func init() {
-	templateLog.Debug("building embedded index template", "parts", len(webPartPaths))
-	var b strings.Builder
-	for _, name := range webPartPaths {
-		templateLog.Debug("reading embedded web asset", "path", name)
-		data, err := webFS.ReadFile(name)
-		if err != nil {
-			templateLog.Error("failed reading embedded web asset", "path", name, "error", err)
-			panic("embed " + name + ": " + err.Error())
-		}
-		b.Write(data)
+	var err error
+	webRoot, err = fs.Sub(webDist, "web/dist")
+	if err != nil {
+		templateLog.Error("failed to sub web dist fs", "error", err)
+		panic("embed web/dist: " + err.Error())
 	}
-	indexHTML = b.String()
-	templateLog.Debug("built index html payload", "bytes", len(indexHTML))
+	templateLog.Debug("embedded web dist ready")
 }
