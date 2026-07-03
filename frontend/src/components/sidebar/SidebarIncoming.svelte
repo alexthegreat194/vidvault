@@ -1,7 +1,8 @@
 <script lang="ts">
 import { get } from 'svelte/store';
 import { allVideos, countIncomingVideos, filters } from '../../lib/stores/library';
-import { clearNewStatus, refresh } from '../../lib/api';
+import { clearNewStatus } from '../../lib/api';
+import { refresh } from '../../lib/stores/library';
 import { toast } from '../../lib/toast';
 
 $: incomingCount = countIncomingVideos();
@@ -48,7 +49,7 @@ async function markAllResolved() {
 		<button
 			type="button"
 			class="tag-btn need-sorting-nav"
-			class:active
+			class:active={active}
 			disabled={disabled}
 			aria-disabled={disabled ? 'true' : 'false'}
 			title={disabled

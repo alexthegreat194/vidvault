@@ -3,8 +3,11 @@ import type {
 	Collection,
 	CollectionsResponse,
 	FolderInfo,
+	MutationResult,
+	ScanProgress,
 	Tag,
 	TagsResponse,
+	UploadResult,
 	Video,
 } from './types';
 
@@ -61,12 +64,28 @@ export async function fetchTagAssignmentsForHashes(
 	return res.json();
 }
 
-export async function moveVideoApi(path: string, dest_folder: string): Promise<Response> {
-	return fetch('/api/move', {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ path, dest_folder }),
-	});
+export async function moveVideoApi(
+	path: string,
+	dest_folder: string,
+): Promise<MutationResult> {
+	try {
+		const res = await fetch('/api/move', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ path, dest_folder }),
+		});
+		if (!res.ok) return { ok: false, message: await res.text() };
+		const data = await res.json();
+		return {
+			ok: true,
+			message: '',
+			path: data.path,
+			old_path: data.old_path,
+			video: data.video,
+		};
+	} catch {
+		return { ok: false, message: 'request failed' };
+	}
 }
 
 export async function mkdirApi(folder: string): Promise<Response> {
@@ -85,15 +104,16 @@ export async function rmdirApi(folder: string): Promise<Response> {
 	});
 }
 
-export async function deleteVideoPath(path: string): Promise<{ ok: boolean; message: string }> {
+export async function deleteVideoPath(path: string): Promise<MutationResult> {
 	try {
 		const res = await fetch('/api/delete', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ path }),
 		});
-		if (res.ok) return { ok: true, message: '' };
-		return { ok: false, message: await res.text() };
+		if (!res.ok) return { ok: false, message: await res.text() };
+		const data = await res.json();
+		return { ok: true, message: '', path: data.path || path };
 	} catch {
 		return { ok: false, message: 'request failed' };
 	}
@@ -102,15 +122,22 @@ export async function deleteVideoPath(path: string): Promise<{ ok: boolean; mess
 export async function renameVideoPath(
 	path: string,
 	name: string,
-): Promise<{ ok: boolean; message: string }> {
+): Promise<MutationResult> {
 	try {
 		const res = await fetch('/api/rename', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ path, name }),
 		});
-		if (res.ok) return { ok: true, message: '' };
-		return { ok: false, message: await res.text() };
+		if (!res.ok) return { ok: false, message: await res.text() };
+		const data = await res.json();
+		return {
+			ok: true,
+			message: '',
+			path: data.path,
+			old_path: data.old_path,
+			video: data.video,
+		};
 	} catch {
 		return { ok: false, message: 'request failed' };
 	}
@@ -285,7 +312,7 @@ export async function forgetVideos(
 	return res.ok;
 }
 
-export async function uploadFile(file: File, folder: string): Promise<unknown[]> {
+export async function uploadFile(file: File, folder: string): Promise<UploadResult[]> {
 	const fd = new FormData();
 	fd.append('file', file);
 	fd.append('folder', folder);
@@ -293,19 +320,33 @@ export async function uploadFile(file: File, folder: string): Promise<unknown[]>
 	return res.json();
 }
 
+export interface StreamVideosOptions {
+	rescan?: boolean;
+	onProgress?: (progress: ScanProgress) => void;
+	onRemoved?: (path: string) => void;
+}
+
 export async function streamVideos(
 	onVideo: (video: Video) => void,
+	opts: StreamVideosOptions = {},
 ): Promise<Video[]> {
-	const res = await fetch('/api/videos/stream');
+	const url = opts.rescan ? '/api/videos/stream?rescan=1' : '/api/videos/stream';
+	const res = await fetch(url);
 	if (!res.ok || !res.body) {
 		const videos = await fetchVideos();
-		for (const v of videos) onVideo(v);
+		const seen = new Set<string>();
+		for (const v of videos) {
+			if (!v?.path || seen.has(v.path)) continue;
+			seen.add(v.path);
+			onVideo(v);
+		}
 		return videos;
 	}
 	const reader = res.body.getReader();
 	const decoder = new TextDecoder();
 	let buffer = '';
 	const streamed: Video[] = [];
+	const seen = new Set<string>();
 	while (true) {
 		const { value, done } = await reader.read();
 		if (done) break;
@@ -317,9 +358,16 @@ export async function streamVideos(
 			if (!trimmed) continue;
 			try {
 				const event = JSON.parse(trimmed);
-				if (event.type === 'video' && event.payload) {
-					streamed.push(event.payload);
-					onVideo(event.payload);
+				if (event.type === 'video' && event.payload?.path) {
+					const v = event.payload as Video;
+					if (seen.has(v.path)) continue;
+					seen.add(v.path);
+					streamed.push(v);
+					onVideo(v);
+				} else if (event.type === 'scan_progress' && event.payload) {
+					opts.onProgress?.(event.payload as ScanProgress);
+				} else if (event.type === 'video_removed' && event.payload?.path) {
+					opts.onRemoved?.(event.payload.path as string);
 				}
 			} catch {
 				/* skip bad line */

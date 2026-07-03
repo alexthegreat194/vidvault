@@ -195,10 +195,29 @@ func buildVideo(root string, relPath string, ext string, info os.FileInfo) (Vide
 	}, nil
 }
 
-func ScanVideosWithCallback(root string, cache *VideoScanCache, onVideo func(Video) error) ([]Video, error) {
+// ScanCallbacks holds optional callbacks during a video scan.
+type ScanCallbacks struct {
+	OnVideo    func(Video) error
+	OnProgress func(found, hashed, cached int)
+}
+
+func ScanVideosWithCallback(root string, cache *VideoScanCache, cb ScanCallbacks) ([]Video, error) {
 	videoLog.Debug("starting video scan", "root", root)
 	var videos []Video
 	activePaths := map[string]struct{}{}
+	var found, hashed, cached int
+	var lastProgress time.Time
+	reportProgress := func() {
+		if cb.OnProgress == nil {
+			return
+		}
+		now := time.Now()
+		if found > 1 && found%25 != 0 && now.Sub(lastProgress) < 500*time.Millisecond {
+			return
+		}
+		lastProgress = now
+		cb.OnProgress(found, hashed, cached)
+	}
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return err
@@ -220,9 +239,11 @@ func ScanVideosWithCallback(root string, cache *VideoScanCache, onVideo func(Vid
 		activePaths[rel] = struct{}{}
 
 		var video Video
+		fromCache := false
 		if cache != nil {
-			if cached, ok := cache.getVideo(rel, cacheKey); ok {
-				video = normalizeVideoFromRelPath(cached, rel)
+			if cachedEntry, ok := cache.getVideo(rel, cacheKey); ok {
+				video = normalizeVideoFromRelPath(cachedEntry, rel)
+				fromCache = true
 			}
 		}
 		if video.Hash == "" {
@@ -239,9 +260,17 @@ func ScanVideosWithCallback(root string, cache *VideoScanCache, onVideo func(Vid
 			video.Modified = info.ModTime()
 		}
 
+		found++
+		if fromCache {
+			cached++
+		} else {
+			hashed++
+		}
+		reportProgress()
+
 		videos = append(videos, video)
-		if onVideo != nil {
-			if err := onVideo(video); err != nil {
+		if cb.OnVideo != nil {
+			if err := cb.OnVideo(video); err != nil {
 				return err
 			}
 		}
@@ -265,7 +294,47 @@ func ScanVideosWithCallback(root string, cache *VideoScanCache, onVideo func(Vid
 // Walks root recursively and returns all video files found, sorted
 // by their relative path. Files with extensions not in videoExts are skipped.
 func ScanVideos(root string, cache *VideoScanCache) ([]Video, error) {
-	return ScanVideosWithCallback(root, cache, nil)
+	return ScanVideosWithCallback(root, cache, ScanCallbacks{})
+}
+
+// VideoFromPath builds or loads a single video entry for relPath under root.
+func VideoFromPath(root string, relPath string, cache *VideoScanCache) (Video, error) {
+	clean := filepath.Clean(filepath.FromSlash(relPath))
+	absPath := filepath.Join(root, clean)
+	info, err := os.Stat(absPath)
+	if err != nil {
+		return Video{}, err
+	}
+	if info.IsDir() {
+		return Video{}, Errors.NotAFile
+	}
+	ext := strings.ToLower(filepath.Ext(clean))
+	if !videoExts[ext] {
+		return Video{}, Errors.NotAFile
+	}
+	cacheKey := MakeVideoCacheKey(info)
+	var v Video
+	fromCache := false
+	if cache != nil {
+		if cachedEntry, ok := cache.getVideo(clean, cacheKey); ok {
+			v = normalizeVideoFromRelPath(cachedEntry, clean)
+			fromCache = true
+		}
+	}
+	if v.Hash == "" {
+		v, err = buildVideo(root, clean, ext, info)
+		if err != nil {
+			return Video{}, err
+		}
+		if cache != nil {
+			cache.setVideo(clean, cacheKey, v)
+		}
+	} else if fromCache {
+		v.Ext = ext
+		v.Size = info.Size()
+		v.Modified = info.ModTime()
+	}
+	return v, nil
 }
 
 func DeleteVideoByPath(root string, relPath string) error {

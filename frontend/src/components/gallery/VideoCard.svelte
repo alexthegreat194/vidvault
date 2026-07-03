@@ -1,28 +1,27 @@
 <script lang="ts">
 import { createEventDispatcher, onDestroy } from 'svelte';
-import { escHtml, formatBytes, formatModified, videoUrl } from '../lib/format';
-import { DEFAULT_LOOP_ALL_VIDEOS, HOVER_PREVIEW_SEEK_SEC, CARD_DRAG_GHOST_OFFSET } from '../lib/constants';
+import { escHtml, formatBytes, formatModified, videoUrl } from '../../lib/format';
+import { DEFAULT_LOOP_ALL_VIDEOS, HOVER_PREVIEW_SEEK_SEC, CARD_DRAG_GHOST_OFFSET } from '../../lib/constants';
 import {
 	hoverPreviewAudioEnabled,
 	hoverPreviewVolume,
 	showCtxMenu,
 	toggleHoverPreviewAudio,
-} from '../lib/stores/ui';
-import { tagMap } from '../lib/stores/library';
-import { setFavorite } from '../lib/api';
-import { toast } from '../lib/toast';
-import { openPlayer } from '../lib/stores/player';
+} from '../../lib/stores/ui';
+import { tagMap } from '../../lib/stores/library';
+import { setFavorite } from '../../lib/api';
+import { toast } from '../../lib/toast';
+import { openPlayer } from '../../lib/stores/player';
 import {
 	enterSelectMode,
 	selectMode,
 	selectedPaths,
 	toggleSelectPath,
-} from '../lib/stores/selection';
-import type { Video } from '../lib/types';
+} from '../../lib/stores/selection';
+import type { Video } from '../../lib/types';
 
 export let video: Video;
 export let index = 0;
-export let listView = false;
 
 const dispatch = createEventDispatcher<{
 	dragstart: { event: DragEvent; path: string };
@@ -199,7 +198,7 @@ function handleDragStartWithGhost(e: DragEvent) {
 }
 </script>
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
+<!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
 <div
 	bind:this={cardEl}
 	class="card"

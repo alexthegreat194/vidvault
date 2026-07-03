@@ -50,9 +50,29 @@ export interface AuthStatus {
 	authenticated: boolean;
 }
 
+export interface ScanProgress {
+	found: number;
+	hashed: number;
+	cached: number;
+}
+
 export interface StreamEvent {
 	type: string;
-	payload?: Video;
+	payload?: Video | ScanProgress | { count?: number; path?: string; message?: string };
+}
+
+export interface UploadResult {
+	name: string;
+	error?: string;
+	video?: Video;
+}
+
+export interface MutationResult {
+	ok: boolean;
+	message: string;
+	path?: string;
+	old_path?: string;
+	video?: Video;
 }
 
 export interface UploadFileItem {

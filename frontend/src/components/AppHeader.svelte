@@ -4,10 +4,11 @@ import {
 	filteredVideos,
 	filters,
 	isVideoDiscoveryLoading,
+	scanProgress,
+	showPinLockBtn,
 } from '../lib/stores/library';
 import {
 	galleryListView,
-	showPinLockBtn,
 	uploadModalOpen,
 } from '../lib/stores/ui';
 import {
@@ -71,7 +72,11 @@ async function handleLock() {
 		{#if $isVideoDiscoveryLoading}
 			<div class="stats-loading">
 				<span class="stats-loading-label">
-					<b>{$filteredVideos.length}</b> / {$allVideos.length} videos · scanning library ({$allVideos.length} found)
+					{#if $scanProgress}
+						Scanning… <b>{$scanProgress.found}</b> found ({$scanProgress.hashed} hashing)
+					{:else}
+						<b>{$filteredVideos.length}</b> / {$allVideos.length} videos · loading library
+					{/if}
 				</span>
 				<span class="stats-loading-bar" aria-hidden="true">
 					<span class="stats-loading-fill"></span>

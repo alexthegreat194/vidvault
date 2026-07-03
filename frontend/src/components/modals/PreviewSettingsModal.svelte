@@ -1,12 +1,11 @@
 <script lang="ts">
-import Modal from './modals/Modal.svelte';
+import Modal from './Modal.svelte';
 import {
 	hoverPreviewAudioEnabled,
 	hoverPreviewVolume,
 	previewSettingsOpen,
-	setHoverPreviewAudioEnabled,
 	toggleHoverPreviewAudio,
-} from '../lib/stores/ui';
+} from '../../lib/stores/ui';
 
 function close() {
 	previewSettingsOpen.set(false);

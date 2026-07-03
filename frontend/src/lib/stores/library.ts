@@ -14,6 +14,7 @@ import type {
 	Collection,
 	DuplicateGroup,
 	FolderInfo,
+	ScanProgress,
 	Tag,
 	Video,
 } from '../types';
@@ -50,6 +51,7 @@ export const tagAssignments = writable<Record<string, string[]>>({});
 export const allCollections = writable<Collection[]>([]);
 export const duplicateGroups = writable<DuplicateGroup[]>([]);
 export const isVideoDiscoveryLoading = writable(false);
+export const scanProgress = writable<ScanProgress | null>(null);
 export const pinGateVisible = writable(false);
 export const pinGateError = writable('');
 export const pinGateMode = writable(false);
@@ -231,6 +233,32 @@ function setDiscoveredVideos(videos: Video[]): void {
 	downloadedVideos.update((dl) => dl.filter((v) => !discoveredPaths.has(v.path)));
 }
 
+export function upsertDiscoveredVideo(video: Video): void {
+	if (!video?.path) return;
+	downloadedVideos.update((dl) => dl.filter((v) => v.path !== video.path));
+	discoveredVideos.update((list) => {
+		const i = list.findIndex((v) => v.path === video.path);
+		if (i >= 0) {
+			const next = [...list];
+			next[i] = video;
+			return next;
+		}
+		return [...list, video];
+	});
+}
+
+export function removeDiscoveredVideo(path: string): void {
+	if (!path) return;
+	discoveredVideos.update((list) => list.filter((v) => v.path !== path));
+	downloadedVideos.update((list) => list.filter((v) => v.path !== path));
+}
+
+export function patchVideoPath(oldPath: string, video: Video): void {
+	if (!oldPath || !video?.path) return;
+	removeDiscoveredVideo(oldPath);
+	upsertDiscoveredVideo(video);
+}
+
 export function upsertDownloadedVideo(video: Video): void {
 	if (!video?.path) return;
 	downloadedVideos.update((dl) => {
@@ -306,7 +334,7 @@ export function refreshDerivedState(mayAutoOpenDuplicates = false): void {
 	updateIncomingBannerState();
 }
 
-async function refreshTagAssignmentsForHashes(hashes: string[]): Promise<void> {
+export async function refreshTagAssignmentsForHashes(hashes: string[]): Promise<void> {
 	const uniqueHashes = [...new Set((hashes || []).filter(Boolean))];
 	if (!uniqueHashes.length) return;
 	const payload = await fetchTagAssignmentsForHashes(uniqueHashes);
@@ -314,7 +342,6 @@ async function refreshTagAssignmentsForHashes(hashes: string[]): Promise<void> {
 	const tagsByHash = Object.fromEntries(
 		updates.map((u) => [u.hash, Array.isArray(u.tags) ? u.tags : []]),
 	);
-	allVideos; // trigger - we need to update videos in place
 	const updateList = (videos: Video[]) => {
 		for (const video of videos) {
 			if (!video?.hash) continue;
@@ -357,56 +384,34 @@ async function refreshVideosFallback(mayAutoOpenDuplicates: boolean): Promise<vo
 
 export async function refreshVideosProgressive(
 	mayAutoOpenDuplicates: boolean,
+	opts: { rescan?: boolean; clearFirst?: boolean } = {},
 ): Promise<void> {
 	isVideoDiscoveryLoading.set(true);
+	scanProgress.set(null);
+	if (opts.clearFirst) {
+		setDiscoveredVideos([]);
+	}
 	try {
-		let lastRenderCount = 0;
-		setDiscoveredVideos([]);
-		refreshDerivedState(mayAutoOpenDuplicates);
-		const streamed = await streamVideos((video) => {
-			// progressive - handled after stream completes in batches
-		});
-		// Re-stream with batching like original
-		const res = await fetch('/api/videos/stream');
-		if (!res.ok || !res.body) {
-			await refreshVideosFallback(mayAutoOpenDuplicates);
-			return;
+		const streamed = await streamVideos(
+			(video) => {
+				upsertDiscoveredVideo(video);
+				updateIncomingBannerState();
+			},
+			{
+				rescan: opts.rescan,
+				onProgress: (p) => scanProgress.set(p),
+				onRemoved: (path) => removeDiscoveredVideo(path),
+			},
+		);
+		for (const video of streamed) {
+			upsertDiscoveredVideo(video);
 		}
-		const reader = res.body.getReader();
-		const decoder = new TextDecoder();
-		let buffer = '';
-		const batch: Video[] = [];
-		setDiscoveredVideos([]);
-		refreshDerivedState(false);
-		while (true) {
-			const { value, done } = await reader.read();
-			if (done) break;
-			buffer += decoder.decode(value, { stream: true });
-			const lines = buffer.split('\n');
-			buffer = lines.pop() || '';
-			for (const line of lines) {
-				const trimmed = line.trim();
-				if (!trimmed) continue;
-				try {
-					const event = JSON.parse(trimmed);
-					if (event.type === 'video' && event.payload) {
-						batch.push(event.payload);
-						if (batch.length - lastRenderCount >= 20) {
-							setDiscoveredVideos([...batch]);
-							refreshDerivedState(false);
-							lastRenderCount = batch.length;
-						}
-					}
-				} catch {
-					/* skip */
-				}
-			}
-		}
-		setDiscoveredVideos(batch.length ? batch : streamed);
 		isVideoDiscoveryLoading.set(false);
+		scanProgress.set(null);
 		refreshDerivedState(mayAutoOpenDuplicates);
 	} catch {
 		await refreshVideosFallback(mayAutoOpenDuplicates);
+		scanProgress.set(null);
 	}
 }
 
@@ -419,12 +424,10 @@ export async function init(): Promise<void> {
 	parseFolders(fr);
 	parseTags(tr);
 	parseCollections(cr);
-	setDiscoveredVideos([]);
-	refreshDerivedState(true);
-	await refreshVideosProgressive(true);
+	await refreshVideosProgressive(true, { clearFirst: false });
 }
 
-export async function refresh(): Promise<void> {
+export async function refresh(opts: { rescan?: boolean } = {}): Promise<void> {
 	const [fr, tr, cr] = await Promise.all([
 		fetchFolders(),
 		fetchTags(),
@@ -433,7 +436,7 @@ export async function refresh(): Promise<void> {
 	parseFolders(fr);
 	parseTags(tr);
 	parseCollections(cr);
-	await refreshVideosProgressive(false);
+	await refreshVideosProgressive(false, { rescan: opts.rescan ?? true, clearFirst: true });
 }
 
 export function moveVideoLocally(srcPath: string, destFolder: string): boolean {
@@ -496,9 +499,8 @@ export function moveVideoLocally(srcPath: string, destFolder: string): boolean {
 export async function moveVideo(srcPath: string, destFolder: string): Promise<void> {
 	const res = await api.moveVideoApi(srcPath, destFolder);
 	if (res.ok) {
-		const localOk = moveVideoLocally(srcPath, destFolder);
-		if (!localOk) await refresh();
-		else {
+		if (res.video) {
+			patchVideoPath(res.old_path || srcPath, res.video);
 			try {
 				await refreshFoldersOnly();
 			} catch {
@@ -507,10 +509,23 @@ export async function moveVideo(srcPath: string, destFolder: string): Promise<vo
 			computeDuplicateGroups();
 			updateDuplicateBannerState(false);
 			updateIncomingBannerState();
+		} else {
+			const localOk = moveVideoLocally(srcPath, destFolder);
+			if (!localOk) await refresh({ rescan: true });
+			else {
+				try {
+					await refreshFoldersOnly();
+				} catch {
+					/* best-effort */
+				}
+				computeDuplicateGroups();
+				updateDuplicateBannerState(false);
+				updateIncomingBannerState();
+			}
 		}
 		toast('Moved to ' + destFolder, 'success');
 	} else {
-		toast('Move failed: ' + (await res.text()), 'error');
+		toast('Move failed: ' + res.message, 'error');
 	}
 }
 
@@ -536,6 +551,7 @@ export function unloadLibraryAfterPinLock(): void {
 	discoveredVideos.set([]);
 	downloadedVideos.set([]);
 	isVideoDiscoveryLoading.set(false);
+	scanProgress.set(null);
 	exitSelectMode();
 	refreshDerivedState(false);
 }

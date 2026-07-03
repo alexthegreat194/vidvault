@@ -59,6 +59,9 @@ keeps track of when something was uploaded, if something was uploaded before the
 - [ ] volume control and setting for viewing a video
 - [ ] handle the edge case for nested folders
 - [ ] scroll to bottom button
+- [ ] favoritite button in modal
+- [ ] a new bulk upload modal
+- [ ] make last uploaded default strting filter
 
 
 Analytics:

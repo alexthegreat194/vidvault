@@ -8,11 +8,10 @@ ARG GO_VERSION=1.24.5
 ARG NODE_VERSION=22-alpine
 FROM --platform=$BUILDPLATFORM node:${NODE_VERSION} AS frontend
 WORKDIR /app
-COPY package.json package-lock.json ./
 COPY frontend/package.json frontend/package-lock.json ./frontend/
-RUN npm ci && cd frontend && npm ci
+RUN npm ci --prefix frontend
 COPY frontend ./frontend
-RUN npm run build:frontend
+RUN npm run build --prefix frontend
 
 FROM --platform=$BUILDPLATFORM golang:${GO_VERSION}-alpine AS builder
 ARG TARGETOS

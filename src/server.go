@@ -28,6 +28,7 @@ type server struct {
 	collections *WatchCollectionsStore
 	seenFiles   *SeenFilesStore
 	videoCache  *video.VideoScanCache
+	library     *video.VideoLibrary
 	mux         *http.ServeMux
 	pin         string
 	authSecret  []byte
@@ -65,6 +66,7 @@ func newServer(root, pin string) (*server, error) {
 		collections: collections,
 		seenFiles:   seenFiles,
 		videoCache:  video.NewVideoScanCache(),
+		library:     video.NewVideoLibrary(),
 		mux:         http.NewServeMux(),
 	}
 	if err := initPinAuth(s, pin); err != nil {
@@ -105,9 +107,46 @@ func newServer(root, pin string) (*server, error) {
 	s.mux.HandleFunc("GET /", s.handleIndex)
 	serverLog.Info("routes registered", "root", root)
 
-	go video.ScanVideos(root, s.videoCache)
+	go s.startupScan()
 
 	return s, nil
+}
+
+func (s *server) enrichVideos(videos []video.Video) error {
+	if err := s.seenFiles.MarkVideos(s.root, videos); err != nil {
+		return err
+	}
+	for i := range videos {
+		s.applyVideoMetadata(&videos[i])
+	}
+	return nil
+}
+
+func (s *server) enrichVideo(v *video.Video) error {
+	videos := []video.Video{*v}
+	if err := s.enrichVideos(videos); err != nil {
+		return err
+	}
+	*v = videos[0]
+	return nil
+}
+
+func (s *server) startupScan() {
+	start := time.Now()
+	videos, err := video.ScanVideosWithCallback(s.root, s.videoCache, video.ScanCallbacks{
+		OnProgress: video.PrintScanProgress,
+	})
+	if err != nil {
+		serverLog.Error("startup video scan failed", "error", err)
+		return
+	}
+	if err := s.enrichVideos(videos); err != nil {
+		serverLog.Error("failed enriching videos during startup scan", "error", err)
+		return
+	}
+	s.library.ReplaceAll(videos)
+	s.library.SetReady(true)
+	video.PrintScanComplete(len(videos), time.Since(start))
 }
 
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -209,20 +248,25 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 // handleVideos HTTP handler for all video metadata
 func (s *server) handleVideos(w http.ResponseWriter, r *http.Request) {
 	serverLog.Debug("handling videos request")
-	videos, err := video.ScanVideos(s.root, s.videoCache)
-	if err != nil {
-		serverLog.Error("failed to scan videos", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if err := s.seenFiles.MarkVideos(s.root, videos); err != nil {
-		serverLog.Error("failed updating seen files state", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	for i := range videos {
-		videos[i].Favorite = s.favorites.IsFavorite(videos[i].Hash)
-		videos[i].Tags = s.tags.TagsForHash(videos[i].Hash)
+	var videos []video.Video
+	if s.library.IsReady() {
+		videos = s.library.AllSorted()
+		for i := range videos {
+			s.applyVideoMetadata(&videos[i])
+		}
+	} else {
+		var err error
+		videos, err = video.ScanVideos(s.root, s.videoCache)
+		if err != nil {
+			serverLog.Error("failed to scan videos", "error", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if err := s.enrichVideos(videos); err != nil {
+			serverLog.Error("failed updating seen files state", "error", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(videos)
@@ -266,36 +310,79 @@ func (s *server) handleVideosStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	videos, err := video.ScanVideosWithCallback(s.root, s.videoCache, func(v video.Video) error {
-		return writeEvent("video", v)
+	rescan := r.URL.Query().Get("rescan") == "1"
+	if s.library.IsReady() && !rescan {
+		videos := s.library.AllSorted()
+		for i := range videos {
+			select {
+			case <-r.Context().Done():
+				return
+			default:
+			}
+			s.applyVideoMetadata(&videos[i])
+			if err := writeEvent("video", videos[i]); err != nil {
+				return
+			}
+		}
+		_ = writeEvent("scan_complete", map[string]any{
+			"count":       len(videos),
+			"duration_ms": time.Since(start).Milliseconds(),
+		})
+		return
+	}
+
+	videos, err := video.ScanVideosWithCallback(s.root, s.videoCache, video.ScanCallbacks{
+		OnProgress: func(found, hashed, cached int) {
+			video.PrintScanProgress(found, hashed, cached)
+			_ = writeEvent("scan_progress", map[string]any{
+				"found":  found,
+				"hashed": hashed,
+				"cached": cached,
+			})
+		},
 	})
 	if err != nil {
 		serverLog.Error("failed streaming videos scan", "error", err)
 		writeEvent("scan_error", map[string]any{"message": err.Error()})
 		return
 	}
-	if err := s.seenFiles.MarkVideos(s.root, videos); err != nil {
+	if err := s.enrichVideos(videos); err != nil {
 		serverLog.Error("failed updating seen files state for stream", "error", err)
 		_ = writeEvent("scan_error", map[string]any{"message": err.Error()})
 		return
 	}
-	count := 0
+	s.library.ReplaceAll(videos)
+	s.library.SetReady(true)
+	video.PrintScanComplete(len(videos), time.Since(start))
+
 	for i := range videos {
 		select {
 		case <-r.Context().Done():
 			return
 		default:
 		}
-		s.applyVideoMetadata(&videos[i])
-		count++
 		if err := writeEvent("video", videos[i]); err != nil {
 			return
 		}
 	}
 	_ = writeEvent("scan_complete", map[string]any{
-		"count":       count,
+		"count":       len(videos),
 		"duration_ms": time.Since(start).Milliseconds(),
 	})
+}
+
+func (s *server) libraryVideos() ([]video.Video, error) {
+	if s.library.IsReady() {
+		return s.library.AllSorted(), nil
+	}
+	videos, err := video.ScanVideos(s.root, s.videoCache)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.enrichVideos(videos); err != nil {
+		return nil, err
+	}
+	return videos, nil
 }
 
 func (s *server) handleClearNewVideos(w http.ResponseWriter, r *http.Request) {
@@ -308,12 +395,8 @@ func (s *server) handleClearNewVideos(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-	videos, err := video.ScanVideos(s.root, s.videoCache)
+	videos, err := s.libraryVideos()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if err := s.seenFiles.MarkVideos(s.root, videos); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -334,7 +417,7 @@ func (s *server) handleForgetVideos(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-	videos, err := video.ScanVideos(s.root, s.videoCache)
+	videos, err := s.libraryVideos()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -636,9 +719,9 @@ func (s *server) handleCreateCollectionFromFolder(w http.ResponseWriter, r *http
 		return
 	}
 
-	videos, err := video.ScanVideos(s.root, s.videoCache)
+	videos, err := s.libraryVideos()
 	if err != nil {
-		serverLog.Error("failed scanning videos for collection snapshot", "folder", req.Folder, "error", err)
+		serverLog.Error("failed loading videos for collection snapshot", "folder", req.Folder, "error", err)
 		http.Error(w, "failed scanning videos", http.StatusInternalServerError)
 		return
 	}
@@ -831,8 +914,43 @@ func (s *server) handleMove(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	destFolder := filepath.Clean(filepath.FromSlash(req.DestFolder))
+	if destFolder == "." || destFolder == "/" {
+		destFolder = ""
+	}
+	newPath := filepath.ToSlash(filepath.Join(destFolder, filepath.Base(filepath.FromSlash(req.Path))))
+
+	var outVideo video.Video
+	if existing, ok := s.library.Get(req.Path); ok {
+		s.library.Remove(req.Path)
+		existing.Path = newPath
+		if destFolder == "" {
+			existing.Folder = "/"
+		} else {
+			existing.Folder = filepath.ToSlash(destFolder)
+		}
+		if v, err := video.VideoFromPath(s.root, newPath, s.videoCache); err == nil {
+			existing.Size = v.Size
+			existing.Modified = v.Modified
+			existing.Hash = v.Hash
+		}
+		_ = s.enrichVideo(&existing)
+		s.library.Upsert(existing)
+		outVideo = existing
+	} else if v, err := video.VideoFromPath(s.root, newPath, s.videoCache); err == nil {
+		_ = s.enrichVideo(&v)
+		s.library.Upsert(v)
+		outVideo = v
+	}
+
 	serverLog.Debug("file moved", "path", req.Path, "dest", req.DestFolder)
-	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"path":    newPath,
+		"old_path": req.Path,
+		"video":   outVideo,
+	})
 }
 
 func (s *server) handleRename(w http.ResponseWriter, r *http.Request) {
@@ -875,8 +993,37 @@ func (s *server) handleRename(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+
+	var outVideo video.Video
+	if existing, ok := s.library.Get(req.Path); ok {
+		s.library.Remove(req.Path)
+		existing.Path = newPath
+		existing.Name = filepath.Base(newPath)
+		existing.Folder = filepath.ToSlash(filepath.Dir(newPath))
+		if existing.Folder == "." {
+			existing.Folder = "/"
+		}
+		if v, err := video.VideoFromPath(s.root, newPath, s.videoCache); err == nil {
+			existing.Size = v.Size
+			existing.Modified = v.Modified
+			existing.Hash = v.Hash
+			existing.Ext = v.Ext
+		}
+		_ = s.enrichVideo(&existing)
+		s.library.Upsert(existing)
+		outVideo = existing
+	} else if v, err := video.VideoFromPath(s.root, newPath, s.videoCache); err == nil {
+		_ = s.enrichVideo(&v)
+		s.library.Upsert(v)
+		outVideo = v
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{"path": newPath})
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"path":     newPath,
+		"old_path": req.Path,
+		"video":    outVideo,
+	})
 	serverLog.Debug("video renamed via api", "path", req.Path, "new_path", newPath)
 }
 
@@ -910,8 +1057,9 @@ func (s *server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type result struct {
-		Name  string `json:"name"`
-		Error string `json:"error,omitempty"`
+		Name  string        `json:"name"`
+		Error string        `json:"error,omitempty"`
+		Video *video.Video  `json:"video,omitempty"`
 	}
 	var results []result
 
@@ -919,12 +1067,19 @@ func (s *server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	serverLog.Debug("processing upload files", "count", len(files), "dest_dir", destDir)
 	for _, fh := range files {
 		res := uploadOne(fh, destDir)
-		results = append(results, result{Name: fh.Filename, Error: res})
+		entry := result{Name: fh.Filename, Error: res}
 		if res == "" {
+			relPath := filepath.ToSlash(filepath.Join(folder, fh.Filename))
+			if v, err := video.VideoFromPath(s.root, relPath, s.videoCache); err == nil {
+				_ = s.enrichVideo(&v)
+				s.library.Upsert(v)
+				entry.Video = &v
+			}
 			serverLog.Debug("upload succeeded", "file", fh.Filename)
 		} else {
 			serverLog.Error("upload failed", "file", fh.Filename, "error", res)
 		}
+		results = append(results, entry)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -961,8 +1116,10 @@ func (s *server) handleDelete(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	s.library.Remove(req.Path)
 	serverLog.Debug("video deleted via api", "path", req.Path)
-	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]string{"path": req.Path})
 }
 
 // uploadOne copies a single multipart file into destDir, validating its

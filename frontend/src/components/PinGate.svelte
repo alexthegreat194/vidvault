@@ -1,8 +1,6 @@
 <script lang="ts">
-import { onMount } from 'svelte';
 import { submitPin } from '../lib/api';
 import {
-	bootstrap,
 	init,
 	pinGateError,
 	pinGateMode,
@@ -45,10 +43,6 @@ async function handleSubmit(e: Event) {
 		setPinOverlayVisible(true, 'Could not reach server.');
 	}
 }
-
-onMount(() => {
-	bootstrap();
-});
 </script>
 
 {#if $pinGateMode}

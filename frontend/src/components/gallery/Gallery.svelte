@@ -1,23 +1,31 @@
 <script lang="ts">
-import VideoCard from './VideoCard.svelte';
+import VirtualGallery from './VirtualGallery.svelte';
 import {
 	allVideos,
+	discoveredVideos,
 	filteredVideos,
 	folderMeta,
 	filters,
 	isVideoDiscoveryLoading,
+	refreshDerivedState,
 } from '../../lib/stores/library';
 import { galleryListView } from '../../lib/stores/ui';
-import { refresh } from '../../lib/stores/library';
 import { clearNewStatus } from '../../lib/api';
 import { toast } from '../../lib/toast';
 
 $: list = $filteredVideos;
 $: f = $filters;
+
+function markFilteredResolved(paths: string[]) {
+	discoveredVideos.update((videos) =>
+		videos.map((v) => (paths.includes(v.path) ? { ...v, is_new: false } : v)),
+	);
+	refreshDerivedState(false);
+}
 </script>
 
-<div id="gallery" class:list-view={$galleryListView}>
-	{#if !list.length}
+{#if !list.length}
+	<div id="gallery" class:list-view={$galleryListView}>
 		{#if $isVideoDiscoveryLoading && $allVideos.length === 0}
 			<div class="empty">
 				<strong>Loading videos...</strong>Please wait while files are discovered.
@@ -32,31 +40,35 @@ $: f = $filters;
 				{/if}
 			</div>
 		{/if}
-	{:else}
-		{#each list as video, i (video.path)}
-			<VideoCard {video} index={i} listView={$galleryListView} />
-		{/each}
-		{#if f.activeIncomingFilter}
-			<div
-				style="grid-column: 1 / -1; display: flex; justify-content: center; padding-top: 8px;"
+	</div>
+{:else}
+	<VirtualGallery videos={list} listView={$galleryListView} />
+	{#if f.activeIncomingFilter}
+		<div class="incoming-resolve-row">
+			<button
+				class="btn"
+				on:click={async () => {
+					const paths = list.map((v) => v.path).filter(Boolean);
+					if (!paths.length) return;
+					const ok = await clearNewStatus(paths, false);
+					if (!ok) {
+						toast('Failed to mark filtered videos as reviewed', 'error');
+						return;
+					}
+					markFilteredResolved(paths);
+					toast('Marked filtered videos as reviewed', 'success');
+				}}
 			>
-				<button
-					class="btn"
-					on:click={async () => {
-						const paths = list.map((v) => v.path).filter(Boolean);
-						if (!paths.length) return;
-						const ok = await clearNewStatus(paths, false);
-						if (!ok) {
-							toast('Failed to mark filtered videos as reviewed', 'error');
-							return;
-						}
-						await refresh();
-						toast('Marked filtered videos as reviewed', 'success');
-					}}
-				>
-					Mark as resolved
-				</button>
-			</div>
-		{/if}
+				Mark as resolved
+			</button>
+		</div>
 	{/if}
-</div>
+{/if}
+
+<style>
+	.incoming-resolve-row {
+		display: flex;
+		justify-content: center;
+		padding-top: 8px;
+	}
+</style>
