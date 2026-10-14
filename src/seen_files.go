@@ -16,6 +16,12 @@ const seenFilesFileName = "seen_files.json"
 type seenFileRecord struct {
 	FirstSeenAt string `json:"first_seen_at"`
 	ReviewedAt  string `json:"reviewed_at,omitempty"`
+	BatchID     string `json:"batch_id,omitempty"`
+}
+
+type BatchStats struct {
+	VideoCount int
+	NewCount   int
 }
 
 type seenFilesDiskState struct {
@@ -29,6 +35,7 @@ type SeenFilesStore struct {
 	path          string
 	rootBaselines map[string]bool
 	entries       map[string]seenFileRecord
+	batches       *UploadBatchesStore
 }
 
 func newSeenFilesStore() (*SeenFilesStore, error) {
@@ -100,12 +107,92 @@ func (s *SeenFilesStore) keyForVideo(v video.Video) string {
 	return "path:" + cleanPath
 }
 
+func (s *SeenFilesStore) StateForVideo(v video.Video) (isNew bool, batchID string) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	key := s.keyForVideo(v)
+	if key == "" {
+		return false, ""
+	}
+	record, ok := s.entries[key]
+	if !ok {
+		return false, ""
+	}
+	return strings.TrimSpace(record.ReviewedAt) == "", strings.TrimSpace(record.BatchID)
+}
+
+func (s *SeenFilesStore) batchCounts() (videoCounts map[string]int, newCounts map[string]int) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	videoCounts = map[string]int{}
+	newCounts = map[string]int{}
+	for _, record := range s.entries {
+		batchID := strings.TrimSpace(record.BatchID)
+		if batchID == "" {
+			continue
+		}
+		videoCounts[batchID]++
+		if strings.TrimSpace(record.ReviewedAt) == "" {
+			newCounts[batchID]++
+		}
+	}
+	return videoCounts, newCounts
+}
+
+func (s *SeenFilesStore) SetBatchIDForVideo(v video.Video, batchID string) error {
+	batchID = strings.TrimSpace(batchID)
+	if batchID == "" {
+		return nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := s.keyForVideo(v)
+	if key == "" {
+		return nil
+	}
+	record, ok := s.entries[key]
+	if !ok {
+		now := time.Now().UTC().Format(time.RFC3339)
+		record = seenFileRecord{FirstSeenAt: now}
+	}
+	record.BatchID = batchID
+	s.entries[key] = record
+	return s.persistLocked()
+}
+
 // MarkVideos mutates each video's IsNew flag and persists seen-state changes.
 func (s *SeenFilesStore) MarkVideos(root string, videos []video.Video) error {
+	batches := s.batches
+	rootKey := normalizeRootKey(root)
+	needsDiscovered := false
+	{
+		s.mu.RLock()
+		baselined := s.rootBaselines[rootKey] || s.rootBaselines["__legacy__"]
+		if baselined {
+			for i := range videos {
+				key := s.keyForVideo(videos[i])
+				if key == "" {
+					continue
+				}
+				if _, ok := s.entries[key]; !ok {
+					needsDiscovered = true
+					break
+				}
+			}
+		}
+		s.mu.RUnlock()
+	}
+
+	discoveredBatchID := ""
+	if needsDiscovered && batches != nil {
+		if id, err := batches.AssignDiscoveredBatch(); err == nil {
+			discoveredBatchID = id
+		}
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	rootKey := normalizeRootKey(root)
 	now := time.Now().UTC().Format(time.RFC3339)
 	changed := false
 
@@ -139,12 +226,18 @@ func (s *SeenFilesStore) MarkVideos(root string, videos []video.Video) error {
 		}
 		record, ok := s.entries[key]
 		if !ok {
-			s.entries[key] = seenFileRecord{FirstSeenAt: now}
+			record := seenFileRecord{FirstSeenAt: now}
+			if discoveredBatchID != "" {
+				record.BatchID = discoveredBatchID
+			}
+			s.entries[key] = record
 			videos[i].IsNew = true
+			videos[i].BatchID = strings.TrimSpace(record.BatchID)
 			changed = true
 			continue
 		}
 		videos[i].IsNew = strings.TrimSpace(record.ReviewedAt) == ""
+		videos[i].BatchID = strings.TrimSpace(record.BatchID)
 	}
 
 	if changed {
@@ -272,6 +365,111 @@ func (s *SeenFilesStore) ForgetForVideos(videos []video.Video, forgetAll bool, p
 			continue
 		}
 		delete(s.entries, key)
+		changed = true
+	}
+	if !changed {
+		return nil
+	}
+	return s.persistLocked()
+}
+
+func (s *SeenFilesStore) SetBatchesStore(batches *UploadBatchesStore) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.batches = batches
+}
+
+func (s *SeenFilesStore) GetBatchID(v video.Video) string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	key := s.keyForVideo(v)
+	if key == "" {
+		return ""
+	}
+	return strings.TrimSpace(s.entries[key].BatchID)
+}
+
+func (s *SeenFilesStore) SetBatchID(v video.Video, batchID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := s.keyForVideo(v)
+	if key == "" {
+		return errors.New("missing video key")
+	}
+	record, ok := s.entries[key]
+	if !ok {
+		return errors.New("seen file record not found")
+	}
+	record.BatchID = strings.TrimSpace(batchID)
+	s.entries[key] = record
+	return s.persistLocked()
+}
+
+func (s *SeenFilesStore) SetBatchIDByKey(key, batchID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key = strings.TrimSpace(key)
+	batchID = strings.TrimSpace(batchID)
+	if key == "" || batchID == "" {
+		return errors.New("missing key or batch id")
+	}
+	record, ok := s.entries[key]
+	if !ok {
+		return errors.New("seen file record not found")
+	}
+	record.BatchID = batchID
+	s.entries[key] = record
+	return s.persistLocked()
+}
+
+func (s *SeenFilesStore) EntriesSnapshot() map[string]seenFileRecord {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make(map[string]seenFileRecord, len(s.entries))
+	for k, v := range s.entries {
+		out[k] = v
+	}
+	return out
+}
+
+func (s *SeenFilesStore) BatchStats() map[string]BatchStats {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	stats := map[string]BatchStats{}
+	for _, record := range s.entries {
+		batchID := strings.TrimSpace(record.BatchID)
+		if batchID == "" {
+			continue
+		}
+		st := stats[batchID]
+		st.VideoCount++
+		if strings.TrimSpace(record.ReviewedAt) == "" {
+			st.NewCount++
+		}
+		stats[batchID] = st
+	}
+	return stats
+}
+
+func (s *SeenFilesStore) AssignBatchIDs(assignments map[string]string) error {
+	if len(assignments) == 0 {
+		return nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	changed := false
+	for key, batchID := range assignments {
+		key = strings.TrimSpace(key)
+		batchID = strings.TrimSpace(batchID)
+		if key == "" || batchID == "" {
+			continue
+		}
+		record, ok := s.entries[key]
+		if !ok {
+			continue
+		}
+		record.BatchID = batchID
+		s.entries[key] = record
 		changed = true
 	}
 	if !changed {

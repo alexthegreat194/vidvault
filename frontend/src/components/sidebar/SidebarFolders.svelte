@@ -5,6 +5,7 @@ import {
 	allVideos,
 	filters,
 	folderMeta,
+	folderVideoCounts,
 	moveVideo,
 	refresh,
 	refreshFoldersOnly,
@@ -31,13 +32,8 @@ function selectFolder(f: string) {
 	filters.update((prev) => ({
 		...prev,
 		activeFolder: f,
-		activeIncomingFilter: f !== '__all__' && prev.activeIncomingFilter ? false : prev.activeIncomingFilter,
+		activeBatchId: f !== '__all__' && prev.activeBatchId ? null : prev.activeBatchId,
 	}));
-}
-
-function folderCount(f: string): number {
-	if (f === '__all__') return get(allVideos).length;
-	return get(allVideos).filter((v) => (v.folder || '/') == f).length;
 }
 
 function showCreateForm() {
@@ -170,7 +166,7 @@ async function handleDrop(e: DragEvent, f: string) {
 				{#if f !== '__all__' && $folderMeta[f]?.has_other_files}
 					<span class="folder-warn" title="Contains non-video files">⚠</span>
 				{/if}
-				<span class="count">{folderCount(f)}</span>
+				<span class="count">{$folderVideoCounts[f] ?? 0}</span>
 				{#if f !== '__all__' && f !== '/'}
 					<button class="watch-folder-collection-btn" title="Make collection from this folder" on:click={(e) => makeCollectionFromFolder(f, e)}>◫</button>
 					<button class="del-folder-btn" title="Delete folder (moves files to root)" on:click={(e) => deleteFolder(f, e)}>✕</button>

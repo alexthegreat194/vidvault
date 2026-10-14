@@ -2,8 +2,7 @@
 import { get } from 'svelte/store';
 import {
 	allCollections,
-	allVideos,
-	countCollectionResolvedVideos,
+	collectionVideoCounts,
 	refresh,
 	refreshCollectionsOnly,
 } from '../../lib/stores/library';
@@ -123,7 +122,7 @@ async function handleRename(collection: Collection, e: MouseEvent) {
 					<rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
 				</svg>
 				<span>{collection.name}</span>
-				<span class="count">{countCollectionResolvedVideos(collection)}</span>
+				<span class="count">{$collectionVideoCounts[collection.id] ?? 0}</span>
 				<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 				<button class="collection-rename-btn" title="Rename collection" on:click|stopPropagation={(e) => handleRename(collection, e)}>✎</button>
 				<!-- svelte-ignore a11y_click_events_have_key_events -->

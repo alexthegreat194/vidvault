@@ -11,6 +11,9 @@ import {
 } from '../storage';
 import type { Video } from '../types';
 
+export const sidebarOpen = writable(false);
+export const discoverMode = writable(false);
+
 export const duplicateBannerDismissed = writable(false);
 export const autoOpenedDuplicates = writable(false);
 export const incomingBannerDismissed = writable(false);
@@ -56,6 +59,8 @@ export const pendingTagActions = writable<Map<string, 'add' | 'remove'>>(new Map
 
 export const collectionPickerTargetHashes = writable<string[]>([]);
 export const collectionPickerSelectedID = writable('');
+
+export const incomingModalBatchId = writable<string | null>(null);
 
 export const incomingSelectedFolder = writable('/');
 export const incomingSelectedTagIDs = writable<Set<string>>(new Set());

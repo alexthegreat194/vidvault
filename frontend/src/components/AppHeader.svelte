@@ -4,11 +4,13 @@ import {
 	filteredVideos,
 	filters,
 	isVideoDiscoveryLoading,
+	pinGateMode,
 	scanProgress,
 	showPinLockBtn,
 } from '../lib/stores/library';
 import {
 	galleryListView,
+	sidebarOpen,
 	uploadModalOpen,
 } from '../lib/stores/ui';
 import {
@@ -22,7 +24,7 @@ import {
 	setPinOverlayVisible,
 	unloadLibraryAfterPinLock,
 } from '../lib/stores/library';
-import { setPinGateUnlocked } from '../lib/auth';
+import { setPinGateUnlocked, setPinGateMode } from '../lib/auth';
 
 function handleSearchInput(e: Event) {
 	const value = (e.target as HTMLInputElement).value;
@@ -57,6 +59,8 @@ async function handleLock() {
 		const ok = await lockSession();
 		if (!ok) return;
 		unloadLibraryAfterPinLock();
+		setPinGateMode(true);
+		pinGateMode.set(true);
 		pinGateUnlocked.set(false);
 		setPinGateUnlocked(false);
 		setPinOverlayVisible(true);
@@ -67,6 +71,11 @@ async function handleLock() {
 </script>
 
 <header>
+	<button class="hamburger-btn" aria-label="Toggle sidebar" on:click={() => sidebarOpen.update(v => !v)}>
+		<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+			<line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+		</svg>
+	</button>
 	<div class="logo">VID<span>VAULT</span></div>
 	<div class="stats" id="stats">
 		{#if $isVideoDiscoveryLoading}

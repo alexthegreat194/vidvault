@@ -7,6 +7,7 @@ import type {
 	ScanProgress,
 	Tag,
 	TagsResponse,
+	UploadBatch,
 	UploadResult,
 	Video,
 } from './types';
@@ -18,7 +19,7 @@ async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 export async function fetchAuthStatus(): Promise<AuthStatus> {
-	const res = await fetch('/api/auth/status');
+	const res = await fetch('/api/auth/status', { credentials: 'same-origin' });
 	return res.json();
 }
 
@@ -50,6 +51,18 @@ export async function fetchCollections(): Promise<CollectionsResponse> {
 
 export async function fetchVideos(): Promise<Video[]> {
 	return jsonFetch('/api/videos');
+}
+
+export async function fetchVideosPage(
+	offset: number,
+	limit: number,
+	opts: { rescan?: boolean } = {},
+): Promise<Video[]> {
+	const params = new URLSearchParams();
+	if (offset > 0) params.set('offset', String(offset));
+	if (limit > 0) params.set('limit', String(limit));
+	if (opts.rescan) params.set('rescan', '1');
+	return jsonFetch<Video[]>(`/api/videos?${params.toString()}`);
 }
 
 export async function fetchTagAssignmentsForHashes(
@@ -312,10 +325,40 @@ export async function forgetVideos(
 	return res.ok;
 }
 
-export async function uploadFile(file: File, folder: string): Promise<UploadResult[]> {
+export async function fetchBatches(): Promise<UploadBatch[]> {
+	return jsonFetch('/api/batches');
+}
+
+export async function createBatch(source = 'upload'): Promise<UploadBatch> {
+	return jsonFetch('/api/batches', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ source }),
+	});
+}
+
+export async function updateBatch(
+	id: string,
+	updates: { name?: string; needs_sorting?: boolean },
+): Promise<UploadBatch> {
+	return jsonFetch(`/api/batches/${encodeURIComponent(id)}`, {
+		method: 'PATCH',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(updates),
+	});
+}
+
+export async function uploadFile(
+	file: File,
+	folder: string,
+	batchId?: string,
+): Promise<UploadResult[]> {
 	const fd = new FormData();
 	fd.append('file', file);
 	fd.append('folder', folder);
+	if (batchId) {
+		fd.append('batch_id', batchId);
+	}
 	const res = await fetch('/api/upload', { method: 'POST', body: fd });
 	return res.json();
 }
@@ -375,4 +418,10 @@ export async function streamVideos(
 		}
 	}
 	return streamed;
+}
+
+export async function fetchRandomVideos(count: number, exclude: string[]): Promise<Video[]> {
+	const params = new URLSearchParams({ count: String(count) });
+	if (exclude.length) params.set('exclude', exclude.join(','));
+	return jsonFetch<Video[]>(`/api/videos/random?${params}`);
 }

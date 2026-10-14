@@ -2,9 +2,11 @@
   "private": true,
   "scripts": {
     "dev:frontend": "npm run dev --prefix frontend",
+    "dev:remote": "./scripts/dev-remote.sh",
     "build:frontend": "npm run build --prefix frontend",
     "build": "npm run build:frontend && go build -o vidvault ./src",
-    "format": "prettier --write \"src/web/**/*.js\" \"frontend/src/**/*.{ts,svelte}\""
+    "format": "prettier --write \"src/web/**/*.js\" \"frontend/src/**/*.{ts,svelte}\"",
+    "seed:videos": "./scripts/generate-test-videos.sh"
   },
   "devDependencies": {
     "prettier": "^3.4.2",

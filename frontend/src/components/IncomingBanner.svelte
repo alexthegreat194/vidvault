@@ -1,23 +1,27 @@
 <script lang="ts">
-import { countIncomingVideos, filters } from '../lib/stores/library';
+import { batchesNeedingSort, filters } from '../lib/stores/library';
 import {
 	incomingBannerDismissed,
+	incomingModalBatchId,
 	incomingModalOpen,
 } from '../lib/stores/ui';
 
-$: incomingCount = countIncomingVideos();
+$: topBatch = $batchesNeedingSort[0] ?? null;
 $: shouldShow =
-	incomingCount > 0 && (!$incomingBannerDismissed || $incomingModalOpen);
+	!!topBatch && (!$incomingBannerDismissed || $incomingModalOpen);
 
 function handleReview() {
+	if (!topBatch) return;
 	filters.update((f) => ({
 		...f,
-		activeIncomingFilter: true,
+		activeBatchId: topBatch.id,
 		activeFolder: '__all__',
 	}));
 }
 
 function handleMassSort() {
+	if (!topBatch) return;
+	incomingModalBatchId.set(topBatch.id);
 	incomingModalOpen.set(true);
 }
 
@@ -28,8 +32,8 @@ function handleDismiss() {
 
 <div id="incoming-banner" class="incoming-banner" class:visible={shouldShow}>
 	<span class="incoming-banner-text" id="incoming-banner-text">
-		{#if incomingCount}
-			{incomingCount} new file{incomingCount === 1 ? '' : 's'} need sorting.
+		{#if topBatch}
+			{topBatch.new_count} new file{topBatch.new_count === 1 ? '' : 's'} in {topBatch.name} need sorting.
 		{/if}
 	</span>
 	<div class="incoming-banner-actions">

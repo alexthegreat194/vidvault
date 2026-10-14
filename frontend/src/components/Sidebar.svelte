@@ -1,13 +1,24 @@
 <script lang="ts">
-import SidebarIncoming from './sidebar/SidebarIncoming.svelte';
+import SidebarBatches from './sidebar/SidebarBatches.svelte';
 import SidebarTags from './sidebar/SidebarTags.svelte';
 import SidebarCollections from './sidebar/SidebarCollections.svelte';
 import SidebarFolders from './sidebar/SidebarFolders.svelte';
-import { previewSettingsOpen } from '../lib/stores/ui';
+import { previewSettingsOpen, sidebarOpen, discoverMode } from '../lib/stores/ui';
+
+function openDiscover() {
+	discoverMode.set(true);
+	sidebarOpen.set(false);
+}
 </script>
 
-<aside>
-	<SidebarIncoming />
+<aside class:sidebar-open={$sidebarOpen}>
+	<div class="sidebar-section" style="padding:0 12px 8px 16px;">
+		<button type="button" class="btn" style="width:100%; display:flex; align-items:center; gap:8px; justify-content:center; color:var(--accent); border-color:var(--accent);" on:click={openDiscover}>
+			<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
+			Discover
+		</button>
+	</div>
+	<SidebarBatches />
 	<SidebarTags />
 	<SidebarCollections />
 	<SidebarFolders />

@@ -1,6 +1,8 @@
 import { defineConfig } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 
+const backend = process.env.VIDVAULT_BACKEND ?? 'http://localhost:8765';
+
 export default defineConfig({
 	plugins: [svelte()],
 	base: '/',
@@ -10,8 +12,9 @@ export default defineConfig({
 	},
 	server: {
 		proxy: {
-			'/api': 'http://localhost:8765',
-			'/video': 'http://localhost:8765',
+			'/api': backend,
+			'/video': backend,
+			'/favicon.svg': backend,
 		},
 	},
 });

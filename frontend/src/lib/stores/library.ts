@@ -6,6 +6,7 @@ import {
 	fetchFolders,
 	fetchTags,
 	fetchTagAssignmentsForHashes,
+	fetchVideosPage,
 	streamVideos,
 } from '../api';
 import { toast } from '../toast';
@@ -16,6 +17,7 @@ import type {
 	FolderInfo,
 	ScanProgress,
 	Tag,
+	UploadBatch,
 	Video,
 } from '../types';
 import {
@@ -28,6 +30,7 @@ import {
 	dupModalOpen,
 	duplicateBannerDismissed,
 	incomingBannerDismissed,
+	incomingModalBatchId,
 	incomingModalOpen,
 } from './ui';
 import { closePlayer, playingPath } from './player';
@@ -39,7 +42,7 @@ export interface FilterState {
 	activeFolder: string;
 	activeTagFilters: Set<string>;
 	showFavoritesOnly: boolean;
-	activeIncomingFilter: boolean;
+	activeBatchId: string | null;
 }
 
 export const discoveredVideos = writable<Video[]>([]);
@@ -49,22 +52,33 @@ export const folderMeta = writable<Record<string, FolderInfo>>({});
 export const allTags = writable<Tag[]>([]);
 export const tagAssignments = writable<Record<string, string[]>>({});
 export const allCollections = writable<Collection[]>([]);
+export const uploadBatches = writable<UploadBatch[]>([]);
 export const duplicateGroups = writable<DuplicateGroup[]>([]);
 export const isVideoDiscoveryLoading = writable(false);
 export const scanProgress = writable<ScanProgress | null>(null);
+// Mobile-only lazy loading: keep only the first few videos in memory until the user asks.
+export const mobileLazyActive = writable(false);
+export const mobileLazyHasMore = writable(false);
+export const mobileLazyLoadingMore = writable(false);
 export const pinGateVisible = writable(false);
 export const pinGateError = writable('');
 export const pinGateMode = writable(false);
 export const pinGateUnlocked = writable(false);
 export const showPinLockBtn = writable(false);
 
+const savedSort = localStorage.getItem('vidvault-sort') || 'name';
+
 export const filters = writable<FilterState>({
 	search: '',
-	sort: 'name',
+	sort: savedSort,
 	activeFolder: '__all__',
 	activeTagFilters: new Set(),
 	showFavoritesOnly: false,
-	activeIncomingFilter: false,
+	activeBatchId: null,
+});
+
+filters.subscribe((f) => {
+	localStorage.setItem('vidvault-sort', f.sort);
 });
 
 export const allVideos = derived(
@@ -141,8 +155,8 @@ export function recomputeFiltered(
 			!q ||
 			v.name.toLowerCase().includes(q) ||
 			(v.folder || '').toLowerCase().includes(q);
-		const inIncoming = !f.activeIncomingFilter || Boolean(v.is_new);
-		return inF && inFav && inT && inS && inIncoming;
+		const inBatch = !f.activeBatchId || v.batch_id === f.activeBatchId;
+		return inF && inFav && inT && inS && inBatch;
 	});
 	return sortVideos(filtered, f.sort);
 }
@@ -150,6 +164,54 @@ export function recomputeFiltered(
 export const filteredVideos = derived(
 	[allVideos, filters],
 	([$videos, $filters]) => recomputeFiltered($videos, $filters),
+);
+
+export const incomingVideoCount = derived(allVideos, ($v) =>
+	$v.filter((video) => Boolean(video.is_new)).length,
+);
+
+export const batchesNeedingSort = derived(uploadBatches, ($batches) =>
+	$batches.filter((b) => b.needs_sorting && b.new_count > 0),
+);
+
+export const activeBatch = derived(
+	[filters, uploadBatches],
+	([$filters, $batches]) =>
+		$filters.activeBatchId
+			? $batches.find((b) => b.id === $filters.activeBatchId) ?? null
+			: null,
+);
+
+export const tagVideoCounts = derived(allVideos, ($v) => {
+	const counts: Record<string, number> = {};
+	for (const video of $v) {
+		for (const tagID of video.tags ?? []) {
+			counts[tagID] = (counts[tagID] ?? 0) + 1;
+		}
+	}
+	return counts;
+});
+
+export const folderVideoCounts = derived(allVideos, ($v) => {
+	const counts: Record<string, number> = { __all__: $v.length };
+	for (const video of $v) {
+		const folder = video.folder || '/';
+		counts[folder] = (counts[folder] ?? 0) + 1;
+	}
+	return counts;
+});
+
+export const collectionVideoCounts = derived(
+	[allVideos, allCollections],
+	([$v, $cols]) => {
+		const byHash = new Set($v.map((video) => video.hash).filter(Boolean));
+		return Object.fromEntries(
+			$cols.map((c) => [
+				c.id,
+				(c.video_hashes ?? []).filter((h) => byHash.has(h)).length,
+			]),
+		);
+	},
 );
 
 export function videoByPath(path: string): Video | undefined {
@@ -166,18 +228,15 @@ export function adjacentInFiltered(path: string, dir: -1 | 1): Video | undefined
 }
 
 export function countIncomingVideos(): number {
-	return get(allVideos).filter((v) => Boolean(v.is_new)).length;
+	return get(incomingVideoCount);
 }
 
 export function tagCountByID(tagID: string): number {
-	return get(allVideos).filter(
-		(v) => Array.isArray(v.tags) && v.tags.includes(tagID),
-	).length;
+	return get(tagVideoCounts)[tagID] ?? 0;
 }
 
 export function countCollectionResolvedVideos(collection: Collection): number {
-	const hashes = new Set(collection.video_hashes || []);
-	return get(allVideos).filter((v) => hashes.has(v.hash)).length;
+	return get(collectionVideoCounts)[collection.id] ?? 0;
 }
 
 export function resolveCollectionVideos(collection: Collection): {
@@ -321,10 +380,13 @@ export function updateDuplicateBannerState(mayAutoOpen: boolean): void {
 }
 
 export function updateIncomingBannerState(): void {
-	const incomingCount = countIncomingVideos();
-	if (!incomingCount) {
+	const needingSort = get(batchesNeedingSort);
+	if (!needingSort.length) {
 		incomingBannerDismissed.set(false);
-		if (get(incomingModalOpen)) incomingModalOpen.set(false);
+		if (get(incomingModalOpen)) {
+			incomingModalOpen.set(false);
+			incomingModalBatchId.set(null);
+		}
 	}
 }
 
@@ -365,6 +427,15 @@ export async function refreshTagsOnly(): Promise<void> {
 	parseTags(data);
 }
 
+export async function refreshBatches(): Promise<void> {
+	try {
+		const batches = await api.fetchBatches();
+		uploadBatches.set(Array.isArray(batches) ? batches : []);
+	} catch {
+		uploadBatches.set([]);
+	}
+}
+
 export async function refreshCollectionsOnly(): Promise<void> {
 	const data = await fetchCollections();
 	parseCollections(data);
@@ -392,10 +463,39 @@ export async function refreshVideosProgressive(
 		setDiscoveredVideos([]);
 	}
 	try {
-		const streamed = await streamVideos(
+		const pendingUpserts: Video[] = [];
+		let flushScheduled = false;
+		const FLUSH_INTERVAL = 200;
+
+		function flushPending() {
+			flushScheduled = false;
+			if (!pendingUpserts.length) return;
+			const batch = pendingUpserts.splice(0);
+			discoveredVideos.update((list) => {
+				const byPath = new Map(list.map((v) => [v.path, v]));
+				for (const v of batch) {
+					if (v?.path) byPath.set(v.path, v);
+				}
+				return [...byPath.values()];
+			});
+			downloadedVideos.update((dl) => {
+				const batchPaths = new Set(batch.map((v) => v.path).filter(Boolean));
+				return dl.filter((v) => !batchPaths.has(v.path));
+			});
+			updateIncomingBannerState();
+		}
+
+		function scheduleFlush() {
+			if (!flushScheduled) {
+				flushScheduled = true;
+				setTimeout(flushPending, FLUSH_INTERVAL);
+			}
+		}
+
+		await streamVideos(
 			(video) => {
-				upsertDiscoveredVideo(video);
-				updateIncomingBannerState();
+				pendingUpserts.push(video);
+				scheduleFlush();
 			},
 			{
 				rescan: opts.rescan,
@@ -403,15 +503,87 @@ export async function refreshVideosProgressive(
 				onRemoved: (path) => removeDiscoveredVideo(path),
 			},
 		);
-		for (const video of streamed) {
-			upsertDiscoveredVideo(video);
-		}
+		flushPending();
+		// Note: the `streamVideos()` callback already queued everything for batched flushing.
 		isVideoDiscoveryLoading.set(false);
 		scanProgress.set(null);
 		refreshDerivedState(mayAutoOpenDuplicates);
 	} catch {
 		await refreshVideosFallback(mayAutoOpenDuplicates);
 		scanProgress.set(null);
+	}
+}
+
+function isMobileClient(): boolean {
+	if (typeof navigator === 'undefined') return false;
+	const w = window as any;
+	const mm = typeof w?.matchMedia === 'function' ? w.matchMedia('(max-width: 600px)') : null;
+	if (mm && typeof mm.matches === 'boolean') return mm.matches;
+	return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+}
+
+const MOBILE_TOP_N = 5;
+const MOBILE_PAGE_SIZE = 25;
+let mobileLazyOffset = 0;
+
+async function initMobileLazy(rescan: boolean): Promise<void> {
+	mobileLazyActive.set(true);
+	mobileLazyLoadingMore.set(false);
+	mobileLazyOffset = 0;
+
+	// Keep memory low: only load a small subset of videos.
+	discoveredVideos.set([]);
+	downloadedVideos.set([]);
+	isVideoDiscoveryLoading.set(true);
+	scanProgress.set(null);
+
+	const firstRaw = await fetchVideosPage(0, MOBILE_TOP_N + 1, { rescan });
+	const first = firstRaw.slice(0, MOBILE_TOP_N);
+	setDiscoveredVideos(first);
+	mobileLazyOffset = first.length;
+	mobileLazyHasMore.set(firstRaw.length > MOBILE_TOP_N);
+
+	isVideoDiscoveryLoading.set(false);
+	scanProgress.set(null);
+	// Avoid auto-opening modals with partial data.
+	refreshDerivedState(false);
+}
+
+export async function loadMoreMobileVideos(): Promise<void> {
+	if (!get(mobileLazyActive)) return;
+	if (get(mobileLazyLoadingMore)) return;
+	if (!get(mobileLazyHasMore)) return;
+
+	mobileLazyLoadingMore.set(true);
+	try {
+		const nextRaw = await fetchVideosPage(
+			mobileLazyOffset,
+			MOBILE_PAGE_SIZE + 1,
+			{ rescan: false },
+		);
+		const next = nextRaw.slice(0, MOBILE_PAGE_SIZE);
+		const paths = new Set(next.map((v) => v?.path).filter(Boolean));
+
+		discoveredVideos.update((list) => {
+			const byPath = new Map<string, Video>();
+			for (const v of list) if (v?.path) byPath.set(v.path, v);
+			for (const v of next) if (v?.path) byPath.set(v.path, v);
+			return [...byPath.values()];
+		});
+
+		downloadedVideos.update((dl) => {
+			if (!paths.size) return dl;
+			return dl.filter((v) => v?.path && !paths.has(v.path));
+		});
+
+		mobileLazyOffset += next.length;
+		mobileLazyHasMore.set(nextRaw.length > MOBILE_PAGE_SIZE && next.length > 0);
+		refreshDerivedState(false);
+	} catch {
+		// On failure, stop further attempts to avoid infinite retries.
+		mobileLazyHasMore.set(false);
+	} finally {
+		mobileLazyLoadingMore.set(false);
 	}
 }
 
@@ -424,10 +596,26 @@ export async function init(): Promise<void> {
 	parseFolders(fr);
 	parseTags(tr);
 	parseCollections(cr);
-	await refreshVideosProgressive(true, { clearFirst: false });
+	if (isMobileClient()) {
+		await Promise.all([refreshBatches(), initMobileLazy(false)]);
+		return;
+	}
+	await Promise.all([refreshBatches(), refreshVideosProgressive(true, { clearFirst: false })]);
 }
 
 export async function refresh(opts: { rescan?: boolean } = {}): Promise<void> {
+	if (isMobileClient()) {
+		const [fr, tr, cr] = await Promise.all([
+			fetchFolders(),
+			fetchTags(),
+			fetchCollections(),
+		]);
+		parseFolders(fr);
+		parseTags(tr);
+		parseCollections(cr);
+		await Promise.all([refreshBatches(), initMobileLazy(opts.rescan ?? true)]);
+		return;
+	}
 	const [fr, tr, cr] = await Promise.all([
 		fetchFolders(),
 		fetchTags(),
@@ -436,7 +624,10 @@ export async function refresh(opts: { rescan?: boolean } = {}): Promise<void> {
 	parseFolders(fr);
 	parseTags(tr);
 	parseCollections(cr);
-	await refreshVideosProgressive(false, { rescan: opts.rescan ?? true, clearFirst: true });
+	await Promise.all([
+		refreshBatches(),
+		refreshVideosProgressive(false, { rescan: opts.rescan ?? true, clearFirst: true }),
+	]);
 }
 
 export function moveVideoLocally(srcPath: string, destFolder: string): boolean {
@@ -551,6 +742,9 @@ export function unloadLibraryAfterPinLock(): void {
 	discoveredVideos.set([]);
 	downloadedVideos.set([]);
 	isVideoDiscoveryLoading.set(false);
+	mobileLazyActive.set(false);
+	mobileLazyHasMore.set(false);
+	mobileLazyLoadingMore.set(false);
 	scanProgress.set(null);
 	exitSelectMode();
 	refreshDerivedState(false);
@@ -570,6 +764,12 @@ export async function bootstrap(): Promise<void> {
 		st = await fetchAuthStatus();
 	} catch (e) {
 		console.error(e);
+		setPinGateMode(true);
+		pinGateMode.set(true);
+		setPinGateUnlocked(false);
+		pinGateUnlocked.set(false);
+		showPinLockBtn.set(false);
+		setPinOverlayVisible(true, 'Could not reach server.');
 		return;
 	}
 	if (!st.pinRequired) {
@@ -578,13 +778,14 @@ export async function bootstrap(): Promise<void> {
 		setPinGateUnlocked(false);
 		pinGateUnlocked.set(false);
 		showPinLockBtn.set(false);
+		setPinOverlayVisible(false);
 		await init();
 		return;
 	}
-	setPinGateMode(true);
-	pinGateMode.set(true);
 	installFetch401Handler();
 	if (st.authenticated) {
+		setPinGateMode(true);
+		pinGateMode.set(true);
 		setPinGateUnlocked(true);
 		pinGateUnlocked.set(true);
 		setPinOverlayVisible(false);
@@ -596,6 +797,8 @@ export async function bootstrap(): Promise<void> {
 	pinGateUnlocked.set(false);
 	showPinLockBtn.set(false);
 	setPinOverlayVisible(true);
+	setPinGateMode(true);
+	pinGateMode.set(true);
 }
 
 export function getUploadFolderOptions(): string[] {

@@ -8,7 +8,18 @@ export interface Video {
 	hash: string;
 	is_favorite: boolean;
 	is_new: boolean;
+	batch_id?: string;
 	tags?: string[];
+}
+
+export interface UploadBatch {
+	id: string;
+	name: string;
+	created_at: string;
+	needs_sorting: boolean;
+	source: 'upload' | 'migrated' | 'discovered';
+	video_count: number;
+	new_count: number;
 }
 
 export interface FolderInfo {

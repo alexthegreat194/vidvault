@@ -4,10 +4,12 @@ import './app.css';
 import { setOnPinLock, setPinGateUnlocked } from './lib/auth';
 import {
 	bootstrap,
+	pinGateMode,
 	pinGateUnlocked,
 	setPinOverlayVisible,
 	unloadLibraryAfterPinLock,
 } from './lib/stores/library';
+import { setPinGateMode } from './lib/auth';
 import PinGate from './components/PinGate.svelte';
 import AppHeader from './components/AppHeader.svelte';
 import DupBanner from './components/DupBanner.svelte';
@@ -25,9 +27,13 @@ import IncomingModal from './components/modals/IncomingModal.svelte';
 import CollectionPickerModal from './components/modals/CollectionPickerModal.svelte';
 import WatchCollectionModal from './components/modals/WatchCollectionModal.svelte';
 import PreviewSettingsModal from './components/modals/PreviewSettingsModal.svelte';
+import DiscoverView from './components/gallery/DiscoverView.svelte';
+import { discoverMode, sidebarOpen } from './lib/stores/ui';
 
 onMount(() => {
 	setOnPinLock(() => {
+		setPinGateMode(true);
+		pinGateMode.set(true);
 		setPinGateUnlocked(false);
 		pinGateUnlocked.set(false);
 		unloadLibraryAfterPinLock();
@@ -42,12 +48,18 @@ onMount(() => {
 <DupBanner />
 <IncomingBanner />
 
+<!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
+<div class="sidebar-backdrop" class:visible={$sidebarOpen} on:click={() => sidebarOpen.set(false)}></div>
 <div class="shell">
 	<Sidebar />
 	<main>
 		<Gallery />
 	</main>
 </div>
+
+{#if $discoverMode}
+	<DiscoverView />
+{/if}
 
 <ContextMenu />
 <SelectBar />

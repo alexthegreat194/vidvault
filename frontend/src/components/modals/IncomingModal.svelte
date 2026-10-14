@@ -7,8 +7,10 @@ import {
 	filters,
 	getMoveFolderOptions,
 	refresh,
+	refreshBatches,
 } from '../../lib/stores/library';
 import {
+	incomingModalBatchId,
 	incomingModalOpen,
 	incomingSelectedFolder,
 	incomingSelectedTagIDs,
@@ -20,11 +22,17 @@ import {
 } from '../../lib/api';
 import { toast } from '../../lib/toast';
 
-$: incoming = $allVideos.filter((v) => Boolean(v.is_new));
+$: batchId = $incomingModalBatchId;
+$: incoming = $allVideos.filter((v) => {
+	if (!v.is_new) return false;
+	if (batchId) return v.batch_id === batchId;
+	return true;
+});
 $: folders = [...new Set([...getMoveFolderOptions(), '/'])].sort();
 
 function close() {
 	incomingModalOpen.set(false);
+	incomingModalBatchId.set(null);
 	incomingSelectedTagIDs.set(new Set());
 	incomingSelectedFolder.set('/');
 }
@@ -51,6 +59,7 @@ async function markReviewed() {
 	}
 	close();
 	await refresh();
+	await refreshBatches();
 }
 
 async function applyMassSort() {
@@ -81,11 +90,14 @@ async function applyMassSort() {
 	}
 	const ok = await clearNewStatus(reviewedPaths, false);
 	if (!ok) toast('Moves completed but clear status failed', 'error');
-	if (ok && !errs && !tagErrs) {
-		filters.update((f) => ({ ...f, activeIncomingFilter: false }));
+	if (ok && !errs && !tagErrs && batchId) {
+		filters.update((f) =>
+			f.activeBatchId === batchId ? { ...f, activeBatchId: null } : f,
+		);
 	}
 	close();
 	await refresh();
+	await refreshBatches();
 	if (errs || tagErrs) {
 		toast(
 			(errs ? errs + ' move(s) failed. ' : '') +
@@ -105,6 +117,9 @@ async function applyMassSort() {
 				<div class="move-title">Mass sort incoming media</div>
 				<div class="move-subtitle" id="incoming-subtitle">
 					{incoming.length} incoming file{incoming.length === 1 ? '' : 's'}
+					{#if batchId}
+						(in batch)
+					{/if}
 				</div>
 			</div>
 			<button class="close-btn" id="incoming-close" on:click={close}>✕</button>

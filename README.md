@@ -50,6 +50,23 @@ cd frontend && npm install && npm run dev
 
 Open http://localhost:5173
 
+### Seed test videos
+
+Fill the gitignored [`data/`](data/) directory with small browser-playable MP4s for gallery testing. Requires [ffmpeg](https://ffmpeg.org/) on the host (e.g. `brew install ffmpeg`).
+
+```bash
+npm run seed:videos
+# or with options:
+./scripts/generate-test-videos.sh -n 100 --folders 4
+npm run seed:videos -- -n 200 --folders 5 --duplicates 10
+```
+
+Use `-n` for count, `--folders` to spread files across subfolders, and `--duplicates` to create identical copies for duplicate-manager testing. Run `./scripts/generate-test-videos.sh --help` for all flags.
+
+After generating, refresh the app. If the server already cached the library, restart it or trigger a rescan (`?rescan=1` on the videos stream).
+
+**Incoming / “need sorting” banner:** the first scan of a media root marks every file as already seen ([`src/seen_files.go`](src/seen_files.go)). To test the incoming flow, generate videos **after** the app has loaded once, or delete the seen-files store (macOS: `~/Library/Application Support/vidvault/seen_files.json`).
+
 ## Run from source
 
 ```bash

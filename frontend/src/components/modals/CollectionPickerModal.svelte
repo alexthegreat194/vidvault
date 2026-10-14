@@ -3,7 +3,7 @@ import { get } from 'svelte/store';
 import Modal from './Modal.svelte';
 import {
 	allCollections,
-	countCollectionResolvedVideos,
+	collectionVideoCounts,
 	refresh,
 	refreshCollectionsOnly,
 } from '../../lib/stores/library';
@@ -94,7 +94,7 @@ async function confirm() {
 						on:click={() => collectionPickerSelectedID.set(collection.id)}
 					>
 						<span>{collection.name}</span>
-						<span class="count">{countCollectionResolvedVideos(collection)}</span>
+						<span class="count">{$collectionVideoCounts[collection.id] ?? 0}</span>
 					</div>
 				{/each}
 			</div>

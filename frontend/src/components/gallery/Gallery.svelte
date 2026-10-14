@@ -1,5 +1,6 @@
 <script lang="ts">
 import VirtualGallery from './VirtualGallery.svelte';
+import BatchHeader from './BatchHeader.svelte';
 import {
 	allVideos,
 	discoveredVideos,
@@ -7,7 +8,11 @@ import {
 	folderMeta,
 	filters,
 	isVideoDiscoveryLoading,
+	mobileLazyActive,
+	mobileLazyHasMore,
+	mobileLazyLoadingMore,
 	refreshDerivedState,
+	loadMoreMobileVideos,
 } from '../../lib/stores/library';
 import { galleryListView } from '../../lib/stores/ui';
 import { clearNewStatus } from '../../lib/api';
@@ -24,6 +29,8 @@ function markFilteredResolved(paths: string[]) {
 }
 </script>
 
+<BatchHeader />
+
 {#if !list.length}
 	<div id="gallery" class:list-view={$galleryListView}>
 		{#if $isVideoDiscoveryLoading && $allVideos.length === 0}
@@ -38,12 +45,34 @@ function markFilteredResolved(paths: string[]) {
 				{:else}
 					Try a different search or folder
 				{/if}
+				{#if $mobileLazyActive && $mobileLazyHasMore}
+					<div class="load-more-container">
+						<button
+							class="btn"
+							disabled={$mobileLazyLoadingMore}
+							on:click={() => void loadMoreMobileVideos()}
+						>
+							{$mobileLazyLoadingMore ? 'Loading...' : 'Load more videos'}
+						</button>
+					</div>
+				{/if}
 			</div>
 		{/if}
 	</div>
 {:else}
 	<VirtualGallery videos={list} listView={$galleryListView} />
-	{#if f.activeIncomingFilter}
+	{#if $mobileLazyActive && $mobileLazyHasMore}
+		<div class="load-more-container">
+			<button
+				class="btn"
+				disabled={$mobileLazyLoadingMore}
+				on:click={() => void loadMoreMobileVideos()}
+			>
+				{$mobileLazyLoadingMore ? 'Loading...' : 'Load more videos'}
+			</button>
+		</div>
+	{/if}
+	{#if f.activeBatchId}
 		<div class="incoming-resolve-row">
 			<button
 				class="btn"
@@ -70,5 +99,12 @@ function markFilteredResolved(paths: string[]) {
 		display: flex;
 		justify-content: center;
 		padding-top: 8px;
+	}
+
+	.load-more-container {
+		display: flex;
+		justify-content: center;
+		padding-top: 10px;
+		padding-bottom: 10px;
 	}
 </style>

@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"math/rand"
+	"strconv"
 	"io"
 	"io/fs"
 	"mime"
@@ -26,8 +28,9 @@ type server struct {
 	favorites   *FavoritesStore
 	tags        *TagsStore
 	collections *WatchCollectionsStore
-	seenFiles   *SeenFilesStore
-	videoCache  *video.VideoScanCache
+	seenFiles      *SeenFilesStore
+	uploadBatches  *UploadBatchesStore
+	videoCache     *video.VideoScanCache
 	library     *video.VideoLibrary
 	mux         *http.ServeMux
 	pin         string
@@ -58,14 +61,20 @@ func newServer(root, pin string) (*server, error) {
 	if err != nil {
 		return nil, err
 	}
+	uploadBatches, err := newUploadBatchesStore(seenFiles)
+	if err != nil {
+		return nil, err
+	}
+	seenFiles.SetBatchesStore(uploadBatches)
 
 	s := &server{
-		root:        root,
-		favorites:   favorites,
-		tags:        tags,
-		collections: collections,
-		seenFiles:   seenFiles,
-		videoCache:  video.NewVideoScanCache(),
+		root:          root,
+		favorites:     favorites,
+		tags:          tags,
+		collections:   collections,
+		seenFiles:     seenFiles,
+		uploadBatches: uploadBatches,
+		videoCache:    video.NewVideoScanCache(),
 		library:     video.NewVideoLibrary(),
 		mux:         http.NewServeMux(),
 	}
@@ -77,6 +86,7 @@ func newServer(root, pin string) (*server, error) {
 	s.mux.HandleFunc("POST /api/auth/lock", s.handleAuthLock)
 	s.mux.HandleFunc("GET /favicon.svg", s.handleFavicon)
 	s.mux.HandleFunc("GET /assets/{path...}", s.handleWebAssets)
+	s.mux.HandleFunc("GET /api/videos/random", s.handleRandomVideos)
 	s.mux.HandleFunc("GET /api/videos", s.handleVideos)
 	s.mux.HandleFunc("GET /api/videos/stream", s.handleVideosStream)
 	s.mux.HandleFunc("GET /api/favorites", s.handleFavorites)
@@ -101,6 +111,9 @@ func newServer(root, pin string) (*server, error) {
 	s.mux.HandleFunc("POST /api/rename", s.handleRename)
 	s.mux.HandleFunc("POST /api/delete", s.handleDelete)
 	s.mux.HandleFunc("POST /api/upload", s.handleUpload)
+	s.mux.HandleFunc("GET /api/batches", s.handleBatches)
+	s.mux.HandleFunc("POST /api/batches", s.handleCreateBatch)
+	s.mux.HandleFunc("PATCH /api/batches/{id}", s.handleUpdateBatch)
 	s.mux.HandleFunc("POST /api/videos/new/clear", s.handleClearNewVideos)
 	s.mux.HandleFunc("POST /api/videos/new/forget", s.handleForgetVideos)
 	s.mux.HandleFunc("GET /video", s.handleVideo)
@@ -117,6 +130,7 @@ func (s *server) enrichVideos(videos []video.Video) error {
 		return err
 	}
 	for i := range videos {
+		videos[i].BatchID = s.seenFiles.GetBatchID(videos[i])
 		s.applyVideoMetadata(&videos[i])
 	}
 	return nil
@@ -246,11 +260,87 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleVideos HTTP handler for all video metadata
+func (s *server) handleRandomVideos(w http.ResponseWriter, r *http.Request) {
+	countStr := r.URL.Query().Get("count")
+	count := 10
+	if countStr != "" {
+		if n, err := strconv.Atoi(countStr); err == nil && n > 0 && n <= 100 {
+			count = n
+		}
+	}
+	excludeStr := r.URL.Query().Get("exclude")
+	excludeSet := make(map[string]bool)
+	if excludeStr != "" {
+		for _, h := range strings.Split(excludeStr, ",") {
+			if h = strings.TrimSpace(h); h != "" {
+				excludeSet[h] = true
+			}
+		}
+	}
+
+	var all []video.Video
+	if s.library.IsReady() {
+		all = s.library.AllSorted()
+	} else {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("[]"))
+		return
+	}
+
+	var candidates []video.Video
+	for _, v := range all {
+		if !excludeSet[v.Hash] {
+			candidates = append(candidates, v)
+		}
+	}
+
+	rand.Shuffle(len(candidates), func(i, j int) {
+		candidates[i], candidates[j] = candidates[j], candidates[i]
+	})
+
+	if len(candidates) > count {
+		candidates = candidates[:count]
+	}
+
+	for i := range candidates {
+		s.applyVideoMetadata(&candidates[i])
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(candidates)
+}
+
 func (s *server) handleVideos(w http.ResponseWriter, r *http.Request) {
 	serverLog.Debug("handling videos request")
+	offsetStr := r.URL.Query().Get("offset")
+	limitStr := r.URL.Query().Get("limit")
+	offset := 0
+	limit := -1
+	if offsetStr != "" {
+		if v, err := strconv.Atoi(offsetStr); err == nil && v > 0 {
+			offset = v
+		}
+	}
+	if limitStr != "" {
+		if v, err := strconv.Atoi(limitStr); err == nil && v > 0 {
+			limit = v
+		}
+	}
+	rescan := r.URL.Query().Get("rescan") == "1"
+
 	var videos []video.Video
-	if s.library.IsReady() {
+	if s.library.IsReady() && !rescan {
 		videos = s.library.AllSorted()
+		// Apply slicing before metadata work (favorite/tags/batch are per-video).
+		start := offset
+		if start > len(videos) {
+			start = len(videos)
+		}
+		end := len(videos)
+		if limit > 0 && start+limit < end {
+			end = start + limit
+		}
+		videos = videos[start:end]
 		for i := range videos {
 			s.applyVideoMetadata(&videos[i])
 		}
@@ -267,7 +357,22 @@ func (s *server) handleVideos(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		// Update the in-memory library so subsequent page requests don't rescan.
+		s.library.ReplaceAll(videos)
+		s.library.SetReady(true)
+
+		start := offset
+		if start > len(videos) {
+			start = len(videos)
+		}
+		end := len(videos)
+		if limit > 0 && start+limit < end {
+			end = start + limit
+		}
+		videos = videos[start:end]
 	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(videos)
 	serverLog.Debug("videos response sent", "count", len(videos))
@@ -276,6 +381,7 @@ func (s *server) handleVideos(w http.ResponseWriter, r *http.Request) {
 func (s *server) applyVideoMetadata(video *video.Video) {
 	video.Favorite = s.favorites.IsFavorite(video.Hash)
 	video.Tags = s.tags.TagsForHash(video.Hash)
+	video.BatchID = s.seenFiles.GetBatchID(*video)
 }
 
 func (s *server) handleVideosStream(w http.ResponseWriter, r *http.Request) {
@@ -1042,6 +1148,14 @@ func (s *server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	if folder == "." || folder == "/" {
 		folder = ""
 	}
+	batchID := strings.TrimSpace(r.FormValue("batch_id"))
+	if batchID != "" {
+		if _, ok := s.uploadBatches.Get(batchID); !ok {
+			serverLog.Error("upload batch not found", "batch_id", batchID)
+			http.Error(w, "batch not found", http.StatusBadRequest)
+			return
+		}
+	}
 	rootAbs, _ := filepath.Abs(s.root)
 	destDir := filepath.Join(s.root, folder)
 	destDirAbs, err := filepath.Abs(destDir)
@@ -1072,6 +1186,10 @@ func (s *server) handleUpload(w http.ResponseWriter, r *http.Request) {
 			relPath := filepath.ToSlash(filepath.Join(folder, fh.Filename))
 			if v, err := video.VideoFromPath(s.root, relPath, s.videoCache); err == nil {
 				_ = s.enrichVideo(&v)
+				if batchID != "" {
+					_ = s.seenFiles.SetBatchIDForVideo(v, batchID)
+					v.BatchID = batchID
+				}
 				s.library.Upsert(v)
 				entry.Video = &v
 			}
@@ -1120,6 +1238,74 @@ func (s *server) handleDelete(w http.ResponseWriter, r *http.Request) {
 	serverLog.Debug("video deleted via api", "path", req.Path)
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]string{"path": req.Path})
+}
+
+func (s *server) handleBatches(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	batches := s.uploadBatches.ListWithStats(s.seenFiles)
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(batches)
+}
+
+func (s *server) handleCreateBatch(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Source string `json:"source"`
+	}
+	if r.Body != nil {
+		_ = json.NewDecoder(r.Body).Decode(&req)
+	}
+	source := strings.TrimSpace(req.Source)
+	if source == "" {
+		source = batchSourceUpload
+	}
+	batch, err := s.uploadBatches.Create(source)
+	if err != nil {
+		serverLog.Error("failed creating batch", "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(batch)
+}
+
+func (s *server) handleUpdateBatch(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPatch {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	id := strings.TrimSpace(r.PathValue("id"))
+	if id == "" {
+		http.Error(w, "missing batch id", http.StatusBadRequest)
+		return
+	}
+	var req struct {
+		Name         *string `json:"name"`
+		NeedsSorting *bool   `json:"needs_sorting"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		serverLog.Error("invalid batch update payload", "error", err)
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	batch, err := s.uploadBatches.Update(id, req.Name, req.NeedsSorting)
+	if err != nil {
+		if err.Error() == "batch not found" {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		serverLog.Error("failed updating batch", "id", id, "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(batch)
 }
 
 // uploadOne copies a single multipart file into destDir, validating its

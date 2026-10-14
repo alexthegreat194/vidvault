@@ -8,7 +8,7 @@ import {
 	refresh,
 	refreshAfterTagDataChange,
 	refreshTagsOnly,
-	tagCountByID,
+	tagVideoCounts,
 } from '../../lib/stores/library';
 import { createTag, deleteTag, fetchTagAssignmentsForHashes } from '../../lib/api';
 import { toast } from '../../lib/toast';
@@ -130,7 +130,7 @@ async function handleCreateTag() {
 				on:click={() => toggleTagFilter(tag.id)}
 			>
 				<span class="tag-chip" style="--tag-color: {tag.color || '#888888'}">{tag.name}</span>
-				<span class="count">{tagCountByID(tag.id)}</span>
+				<span class="count">{$tagVideoCounts[tag.id] ?? 0}</span>
 				<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 				<span class="tag-remove-btn" title="Delete tag" on:click={(e) => removeTag(tag.id, tag.name, e)}>✕</span>
 			</button>

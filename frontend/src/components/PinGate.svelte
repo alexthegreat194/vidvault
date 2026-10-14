@@ -16,11 +16,11 @@ let inputEl: HTMLInputElement | undefined;
 
 $: if ($pinGateVisible && inputEl) {
 	inputEl.readOnly = true;
-	queueMicrotask(() => inputEl?.focus());
-}
-
-function handleFocus() {
-	if (inputEl) inputEl.readOnly = false;
+	queueMicrotask(() => {
+		if (!inputEl) return;
+		inputEl.focus();
+		inputEl.readOnly = false;
+	});
 }
 
 async function handleSubmit(e: Event) {
@@ -30,7 +30,11 @@ async function handleSubmit(e: Event) {
 		const res = await submitPin(pinInput);
 		if (!res.ok) {
 			setPinOverlayVisible(true, 'Incorrect PIN.');
-			inputEl?.select();
+			if (inputEl) {
+				inputEl.readOnly = false;
+				inputEl.focus();
+				inputEl.select();
+			}
 			return;
 		}
 		pinGateUnlocked.set(true);
@@ -41,16 +45,16 @@ async function handleSubmit(e: Event) {
 	} catch (err) {
 		console.error(err);
 		setPinOverlayVisible(true, 'Could not reach server.');
+		if (inputEl) inputEl.readOnly = false;
 	}
 }
 </script>
 
-{#if $pinGateMode}
+{#if $pinGateMode && $pinGateVisible}
 	<div
 		id="pin-gate-overlay"
 		class="pin-gate-overlay"
-		aria-hidden={$pinGateVisible ? 'false' : 'true'}
-		hidden={!$pinGateVisible}
+		aria-hidden="false"
 	>
 		<div class="pin-gate-dialog" role="dialog" aria-labelledby="pin-gate-title">
 			<div class="logo pin-gate-logo">VID<span>VAULT</span></div>
@@ -81,7 +85,6 @@ async function handleSubmit(e: Event) {
 					data-bwignore
 					data-form-type="other"
 					disabled={!$pinGateVisible}
-					on:focus={handleFocus}
 				/>
 				{#if $pinGateError}
 					<p id="pin-gate-error" class="pin-gate-error">{$pinGateError}</p>

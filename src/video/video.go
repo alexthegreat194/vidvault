@@ -42,6 +42,7 @@ type Video struct {
 	Hash     string    `json:"hash"`     // SHA-256 hash of the file
 	Favorite bool      `json:"is_favorite"`
 	IsNew    bool      `json:"is_new"`
+	BatchID  string    `json:"batch_id,omitempty"`
 	Tags     []string  `json:"tags,omitempty"` // list of tag IDs applied to this video hash
 }
 
@@ -219,8 +220,13 @@ func ScanVideosWithCallback(root string, cache *VideoScanCache, cb ScanCallbacks
 		cb.OnProgress(found, hashed, cached)
 	}
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return err
+		if err != nil {
+			// Don't abort the full scan for a single unreadable entry.
+			videoLog.Error("walkdir entry error (skipping)", "path", path, "error", err)
+			return nil
+		}
+		if d.IsDir() {
+			return nil
 		}
 		ext := strings.ToLower(filepath.Ext(path))
 		if !videoExts[ext] {
@@ -236,6 +242,13 @@ func ScanVideosWithCallback(root string, cache *VideoScanCache, cb ScanCallbacks
 			return err
 		}
 		cacheKey := MakeVideoCacheKey(info)
+		// Some broken transfers/failed downloads can leave 0-byte files behind.
+		// Hashing/serving them tends to fail later, so skip them entirely.
+		if info.Size() == 0 {
+			videoLog.Warn("skipping zero-byte video", "path", rel, "ext", ext)
+			return nil
+		}
+
 		activePaths[rel] = struct{}{}
 
 		var video Video
@@ -249,7 +262,19 @@ func ScanVideosWithCallback(root string, cache *VideoScanCache, cb ScanCallbacks
 		if video.Hash == "" {
 			video, err = buildVideo(root, rel, ext, info)
 			if err != nil {
-				return err
+				// If a single video file cannot be read/hashed (e.g. IO error),
+				// don't abort the entire scan; skip just that file.
+				videoLog.Error(
+					"failed building video (skipping)",
+					"path",
+					rel,
+					"abs_root",
+					root,
+					"error",
+					err,
+				)
+				delete(activePaths, rel)
+				return nil
 			}
 			if cache != nil {
 				cache.setVideo(rel, cacheKey, video)
@@ -307,6 +332,10 @@ func VideoFromPath(root string, relPath string, cache *VideoScanCache) (Video, e
 	}
 	if info.IsDir() {
 		return Video{}, Errors.NotAFile
+	}
+	if info.Size() == 0 {
+		// Treat as invalid; callers typically surface this as “not found” / skipped.
+		return Video{}, errors.New("zero-byte video")
 	}
 	ext := strings.ToLower(filepath.Ext(clean))
 	if !videoExts[ext] {
